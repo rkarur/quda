@@ -274,12 +274,39 @@ int main(int argc, char **argv)
   smear_param.alpha2 = gauge_smear_alpha2;
   smear_param.alpha3 = gauge_smear_alpha3;
   smear_param.dir_ignore = gauge_smear_dir_ignore;
-  
 
+  quda::ColorSpinorField check,check_out;  
+  QudaInvertParam invParam = newQudaInvertParam();
+  invParam.cpu_prec = QUDA_DOUBLE_PRECISION;
+  invParam.cuda_prec = QUDA_DOUBLE_PRECISION;
+  invParam.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
+  invParam.dirac_order = QUDA_DIRAC_ORDER;
+
+  constexpr int nSpin = 4;
+  constexpr int nColor = 3;
   quda::ColorSpinorParam cs_param, cs_param_out;
-  QudaInvertParam inv_param = newQudaInvertParam();
-  constructWilsonTestSpinorParam(&cs_param, &inv_param, &gauge_param);
+  cs_param.nColor = nColor;
+  cs_param.nSpin = nSpin;
+  cs_param.x = {xdim, ydim, zdim, tdim};
+  cs_param.siteSubset = QUDA_FULL_SITE_SUBSET;
+  cs_param.setPrecision(invParam.cpu_prec);
+  cs_param.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
+  cs_param.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+  cs_param.gammaBasis = invParam.gamma_basis;
+  cs_param.pc_type = QUDA_4D_PC;
+  cs_param.location = QUDA_CPU_FIELD_LOCATION;
+  cs_param.create = QUDA_NULL_FIELD_CREATE;
+
+  cs_param_out = cs_param;
+      
+  constructWilsonTestSpinorParam(&cs_param, &invParam, &gauge_param);
+  check = quda::ColorSpinorField(cs_param);
+  constructWilsonTestSpinorParam(&cs_param_out, &invParam, &gauge_param);
+  check_out = quda::ColorSpinorField(cs_param_out);
+    // constructWilsonTestSpinorParam(&cs_param, &inv_param, &gauge_param);
   
+    
+  // quda::ColorSpinorField rngDummy(cs_param), rngDummy1(cs_param_out);
     
   host_timer.start(); // start the timer
   switch (smear_param.smear_type) {
@@ -298,7 +325,7 @@ int main(int argc, char **argv)
     for (int i = 0; i < gauge_smear_steps / measurement_interval + 1; i++) {
       obs_param[i].compute_plaquette = QUDA_BOOLEAN_TRUE;
     }
-    performWFlowQuda(&smear_param, obs_param);
+    performGFlowQuda(check.data(),check_out.data(), &invParam, &smear_param, obs_param);
     break;
   }
   default: errorQuda("Undefined gauge smear type %d given", smear_param.smear_type);
