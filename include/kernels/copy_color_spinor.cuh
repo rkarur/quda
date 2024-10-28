@@ -24,7 +24,9 @@ namespace quda
     int ret_val = f.SiteOrder() == QUDA_ODD_EVEN_SITE_ORDER ? 1 : 0;
 
     // Account for potential parity flip to access single parity subset QDP-JIT fields
-    if (f.FieldOrder() == QUDA_QDPJIT_FIELD_ORDER && f.SiteSubset() == QUDA_PARITY_SITE_SUBSET) {
+    // The Flip is only needed fir offsetting into Odd Parity Fields
+    if (f.FieldOrder() == QUDA_QDPJIT_FIELD_ORDER && f.SiteSubset() == QUDA_PARITY_SITE_SUBSET
+        && f.SuggestedParity() == QUDA_ODD_PARITY) {
       ret_val = 1 - ret_val;
     }
 
