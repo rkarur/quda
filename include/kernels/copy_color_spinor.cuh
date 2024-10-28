@@ -21,7 +21,7 @@ namespace quda
    * @details Pick parity from input field site order. Addditionally QDPJIT fields
    *  may need a relative parity flip compared to what is expected when dealing with
    *  only the odd parity since the pointer is always to the top of the full spinort.
-   * @param f[in] Reference to the field for parity computation
+   * @param[in] f Reference to the field for parity computation
    * @return the computed parity
    */
   inline int computeParity(const ColorSpinorField &f)
