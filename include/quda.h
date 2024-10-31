@@ -1694,6 +1694,18 @@ extern "C" {
    */
   void performGFlowQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaGaugeSmearParam *smear_param,
                         QudaGaugeObservableParam *obs_param);
+    
+  /**
+   * Performs Adjoint Gradient Flow (gauge + fermion) the "safe" way on gaugePrecise and stores it in gaugeSmeared
+   * @param[out] h_out Output fermion field
+   * @param[in] h_in Input fermion field
+   * @param[in] smear_param Parameter struct that defines the computation parameters
+   * @param[in,out] obs_param Parameter struct that defines which
+   * observables we are making and the resulting observables.
+   */  
+  void performAdjGFlowSafe(void *h_out, void *h_in, QudaInvertParam *inv_param, int nsteps);
+    
+    
 
   /**
    * @brief Calculates a variety of gauge-field observables.  If a

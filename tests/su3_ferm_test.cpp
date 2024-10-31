@@ -166,76 +166,6 @@ int main(int argc, char **argv)
   // start the timer
   quda::host_timer_t host_timer;
 
-//   // We call gaugeObservablesQuda multiple times to time each bit individually
-
-//   // Compute the plaquette
-//   param.compute_plaquette = QUDA_BOOLEAN_TRUE;
-
-//   // Tuning call
-//   gaugeObservablesQuda(&param);
-
-//   host_timer.start();
-//   for (int i = 0; i < niter; i++) gaugeObservablesQuda(&param);
-//   host_timer.stop();
-//   double secs_plaquette = host_timer.last() / niter;
-//   double perf_plaquette = flops_plaquette / (secs_plaquette * 1024 * 1024 * 1024);
-//   printfQuda(
-//     "Computed plaquette gauge precise is %.16e (spatial = %.16e, temporal = %.16e), done in %g seconds, %g GFLOPS\n",
-//     param.plaquette[0], param.plaquette[1], param.plaquette[2], secs_plaquette, perf_plaquette);
-//   param.compute_plaquette = QUDA_BOOLEAN_FALSE;
-
-//   // Compute the temporal Polyakov loop
-//   param.compute_polyakov_loop = QUDA_BOOLEAN_TRUE;
-
-//   // Tuning call
-//   gaugeObservablesQuda(&param);
-
-//   host_timer.start();
-//   for (int i = 0; i < niter; i++) gaugeObservablesQuda(&param);
-//   host_timer.stop();
-//   double secs_ploop = host_timer.last() / niter;
-//   double perf_ploop = flops_ploop / (secs_ploop * 1024 * 1024 * 1024);
-//   printfQuda("Computed Polyakov loop gauge precise is %.16e +/- I %.16e , done in %g seconds, %g GFLOPS\n",
-//              param.ploop[0], param.ploop[1], secs_ploop, perf_ploop);
-//   param.compute_polyakov_loop = QUDA_BOOLEAN_FALSE;
-
-//   // Topological charge and gauge energy
-//   double q_charge_check = 0.0;
-//   // Size of floating point data
-//   size_t data_size = prec == QUDA_DOUBLE_PRECISION ? sizeof(double) : sizeof(float);
-//   size_t array_size = V * data_size;
-//   void *qDensity = pinned_malloc(array_size);
-
-//   // start the timer
-//   host_timer.start();
-
-//   param.compute_qcharge = QUDA_BOOLEAN_TRUE;
-//   param.compute_qcharge_density = QUDA_BOOLEAN_TRUE;
-//   param.qcharge_density = qDensity;
-
-//   gaugeObservablesQuda(&param);
-
-//   // stop the timer
-//   host_timer.stop();
-//   printfQuda("Computed Etot, Es, Et, Q is\n%.16e %.16e, %.16e %.16e\nDone in %g secs\n", param.energy[0],
-//              param.energy[1], param.energy[2], param.qcharge, host_timer.last());
-
-//   // Ensure host array sums to return value
-//   if (prec == QUDA_DOUBLE_PRECISION) {
-//     for (int i = 0; i < V; i++) q_charge_check += ((double *)qDensity)[i];
-//   } else {
-//     for (int i = 0; i < V; i++) q_charge_check += ((float *)qDensity)[i];
-//   }
-
-//   // release memory
-//   host_free(qDensity);
-
-//   // Q charge Reduction and normalisation
-//   quda::comm_allreduce_sum(q_charge_check);
-
-//   printfQuda("GPU value %e and host density sum %e. Q charge deviation: %e\n", param.qcharge, q_charge_check,
-//              param.qcharge - q_charge_check);
-
   // The user may specify which measurements they wish to perform/omit
   // using the QudaGaugeObservableParam struct, and whether or not to
   // perform suN projection at each measurement step. We recommend that
@@ -301,8 +231,8 @@ int main(int argc, char **argv)
       
   constructWilsonTestSpinorParam(&cs_param, &invParam, &gauge_param);
   check = quda::ColorSpinorField(cs_param);
-  constructWilsonTestSpinorParam(&cs_param_out, &invParam, &gauge_param);
-  check_out = quda::ColorSpinorField(cs_param_out);
+  // constructWilsonTestSpinorParam(&cs_param_out, &invParam, &gauge_param);
+  check_out = quda::ColorSpinorField(cs_param);
     // constructWilsonTestSpinorParam(&cs_param, &inv_param, &gauge_param);
   
     

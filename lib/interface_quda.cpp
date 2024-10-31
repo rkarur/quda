@@ -5370,6 +5370,63 @@ void performGFlowQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaG
   popOutputPrefix();
 
 } /* end of performGFlowQuda */
+   
+
+
+void performAdjGFlowSafe(void *h_out, void *h_in, QudaInvertParam *inv_param, int nsteps)
+{
+
+//MKAE g_in :void *g_in how?
+GaugeFieldParam gParamDummy(*gaugeSmeared);
+GaugeField gaugeAux(gParamDummy);
+GaugeField* gout_steps= new GaugeField[nsteps*3];
+    
+GaugeFieldParam gParam(*gaugePrecise);
+gParam.reconstruct = QUDA_RECONSTRUCT_NO; // temporary field is not on manifold so cannot use reconstruct
+GaugeField gaugeTemp(gParam);
+
+GaugeField &g_in = *gaugeSmeared;
+    
+if (gParamDummy.order <= 4) gParamDummy.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+    
+auto smear_type = QUDA_GAUGE_SMEAR_WILSON_FLOW;
+// GaugeField &g_in = *gaugeSmeared;
+// GaugeField *in = GaugeField::Create(gParamDummy);
+    
+// // Set the specific input parameters and create the cpu gauge field
+// GaugeFieldParam gauge_param(&gParamDummy, g_in);
+
+// if (gauge_param.order <= 4) gauge_param.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+// GaugeField *work_gauge_in = GaugeField::Create(gauge_param);
+
+
+// = gaugeAux;
+
+    for (int i = 0; i < nsteps; i++){
+        for (int ss = 0; ss < 3; ss++){
+            GaugeField *in = GaugeField::Create(gParamDummy);
+            gout_steps[i*3 + ss] = *in;
+        }
+    }
+    
+    for (unsigned int i = 0; i < nsteps; i++) {
+        
+        if (i == 0)
+            GFlowStep(gout_steps[i*3 + 0], gaugeTemp, g_in, 0.01, smear_type, WFLOW_STEP_W1);
+        else
+            GFlowStep(gout_steps[i*3 + 0], gaugeTemp, gout_steps[(i-1)*3 + 2], 0.01, smear_type, WFLOW_STEP_W1);
+        
+        GFlowStep(gout_steps[i*3 + 1], gaugeTemp, gout_steps[i*3 + 0], 0.01, smear_type, WFLOW_STEP_W2);
+        GFlowStep(gout_steps[i*3 + 2], gaugeTemp, gout_steps[i*3 + 1], 0.01, smear_type, WFLOW_STEP_VT);
+        
+        
+    }
+
+
+}
+
+    
+/* save list of gauge vectors */
 
 int computeGaugeFixingOVRQuda(void *gauge, const unsigned int gauge_dir, const unsigned int Nsteps,
                               const unsigned int verbose_interval, const double relax_boost, const double tolerance,
