@@ -5377,9 +5377,21 @@ void performAdjGFlowSafe(void *h_out, void *h_in, QudaInvertParam *inv_param, in
 {
 
 //MKAE g_in :void *g_in how?
+
+    
+    
+    
 GaugeFieldParam gParamDummy(*gaugeSmeared);
 GaugeField gaugeAux(gParamDummy);
 GaugeField* gout_steps= new GaugeField[nsteps*3];
+ 
+//TODO   
+// Set the specific input parameters and create the cpu gauge field
+// GaugeFieldParam gauge_param(*param, g_in);
+
+// if (gauge_param.order <= 4) gauge_param.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+// GaugeField *in = GaugeField::Create(gauge_param);        
+
     
 GaugeFieldParam gParam(*gaugePrecise);
 gParam.reconstruct = QUDA_RECONSTRUCT_NO; // temporary field is not on manifold so cannot use reconstruct
@@ -5390,8 +5402,6 @@ GaugeField &g_in = *gaugeSmeared;
 if (gParamDummy.order <= 4) gParamDummy.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
     
 auto smear_type = QUDA_GAUGE_SMEAR_WILSON_FLOW;
-// GaugeField &g_in = *gaugeSmeared;
-// GaugeField *in = GaugeField::Create(gParamDummy);
     
 // // Set the specific input parameters and create the cpu gauge field
 // GaugeFieldParam gauge_param(&gParamDummy, g_in);
@@ -5410,7 +5420,6 @@ auto smear_type = QUDA_GAUGE_SMEAR_WILSON_FLOW;
     }
     
     for (unsigned int i = 0; i < nsteps; i++) {
-        
         if (i == 0)
             GFlowStep(gout_steps[i*3 + 0], gaugeTemp, g_in, 0.01, smear_type, WFLOW_STEP_W1);
         else
@@ -5418,10 +5427,98 @@ auto smear_type = QUDA_GAUGE_SMEAR_WILSON_FLOW;
         
         GFlowStep(gout_steps[i*3 + 1], gaugeTemp, gout_steps[i*3 + 0], 0.01, smear_type, WFLOW_STEP_W2);
         GFlowStep(gout_steps[i*3 + 2], gaugeTemp, gout_steps[i*3 + 1], 0.01, smear_type, WFLOW_STEP_VT);
-        
-        
     }
+    
+    
+  // helper gauge field for Laplace operator
+  GaugeField precise;
+  GaugeFieldParam gParam_helper(*gaugePrecise);
+  gParam_helper.create = QUDA_NULL_FIELD_CREATE;
+  precise = GaugeField(gParam_helper);
 
+  // spinor fields
+  ColorSpinorParam cpuParam(h_in, *inv_param, gaugePrecise->X(), false, inv_param->input_location);
+  ColorSpinorField fin_h(cpuParam);
+
+  ColorSpinorParam deviceParam(cpuParam, *inv_param, QUDA_CUDA_FIELD_LOCATION);
+  ColorSpinorField fin(deviceParam);
+  fin = fin_h;
+
+  deviceParam.create = QUDA_NULL_FIELD_CREATE;
+  ColorSpinorField fout(deviceParam);
+
+  int parity = 0;
+
+  // initialize a and b for Laplace operator
+  double a = 1.;
+  double b = -8.;  
+    
+  int comm_dim[4] = {};
+    
+  // only switch on comms needed for directions with a derivative
+  for (int i = 0; i < 4; i++) { comm_dim[i] = comm_dim_partitioned(i); }
+
+  // auxilliary fermion fields [0], [1], [2] and [3]
+  ColorSpinorField f_temp0(deviceParam);
+  ColorSpinorField f_temp1(deviceParam);
+  ColorSpinorField f_temp2(deviceParam);
+  ColorSpinorField f_temp3(deviceParam);
+  ColorSpinorField f_temp4(deviceParam);
+
+  // set [3] = input spinor
+  f_temp3 = fin;
+
+  int measurement_n = 0; // The nth measurement to take
+    
+  for (unsigned int i = nsteps - 1; i >= 0; i--) {
+    //TODO: REPLACE
+    // if (i > 0) std::swap(gin, gout); // output from prior step becomes input for next step
+
+    // init auxilliary fields [0], [1] and [2] as [3]
+    f_temp0 = f_temp3;
+    f_temp1 = f_temp3;
+    f_temp2 = f_temp3;
+      
+    int index_g = i * 3;
+      
+    copyExtendedGauge(precise, gout_steps[index_g + 2], QUDA_CUDA_FIELD_LOCATION);
+    precise.exchangeGhost();
+    ApplyLaplace(f_temp4, f_temp0, precise, 4, a, b, f_temp0, parity, false, comm_dim, profileGFlow);  
+      
+    // f_temp0 = 3./4.*f_temp4;
+    blas::ax(3. / 4., f_temp4);
+    
+    f_temp2 = f_temp4;
+      
+    copyExtendedGauge(precise, gout_steps[index_g + 1], QUDA_CUDA_FIELD_LOCATION);
+    precise.exchangeGhost();  
+    ApplyLaplace(f_temp4, f_temp2, precise, 4, a, b, f_temp2, parity, false, comm_dim, profileGFlow); 
+    
+      
+    blas::axpy(8. / 9., f_temp4, f_temp3);
+    
+    f_temp1 = f_temp3;
+    f_temp4 = f_temp1;
+      
+    blas::axpy(-8. / 9.,f_temp2, f_temp4);
+      
+    copyExtendedGauge(precise, gout_steps[index_g + 0], QUDA_CUDA_FIELD_LOCATION);
+    precise.exchangeGhost();  
+    ApplyLaplace(f_temp0, f_temp4, precise, 4, a, b, f_temp4, parity, false, comm_dim, profileGFlow); 
+      
+    blas::axpy(1.,f_temp2, f_temp0);
+    blas::axpy(1.,f_temp1, f_temp0);
+    
+    fout = f_temp0;
+  }
+
+  cpuParam.v = h_out;
+  cpuParam.location = inv_param->output_location;
+  ColorSpinorField fout_h(cpuParam);
+  fout_h = fout;
+
+  popOutputPrefix();  
+  
 
 }
 
