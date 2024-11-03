@@ -1703,7 +1703,7 @@ extern "C" {
    * @param[in,out] obs_param Parameter struct that defines which
    * observables we are making and the resulting observables.
    */  
-  void performAdjGFlowSafe(void *h_out, void *h_in, QudaInvertParam *inv_param, int nsteps);
+  void performAdjGFlowSafe(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaGaugeSmearParam *smear_param, int nsteps);
     
     
 

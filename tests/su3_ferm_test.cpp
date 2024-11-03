@@ -25,7 +25,7 @@ double gauge_smear_alpha = 0.6;
 double gauge_smear_alpha1 = 0.75;
 double gauge_smear_alpha2 = 0.6;
 double gauge_smear_alpha3 = 0.3;
-int gauge_smear_steps = 50;
+int gauge_smear_steps = 5;
 QudaGaugeSmearType gauge_smear_type = QUDA_GAUGE_SMEAR_STOUT;
 int gauge_smear_dir_ignore = -1;
 int measurement_interval = 5;
@@ -237,7 +237,7 @@ int main(int argc, char **argv)
   
     
   // quda::ColorSpinorField rngDummy(cs_param), rngDummy1(cs_param_out);
-    
+  printf("Stage -1 passed\n");  
   host_timer.start(); // start the timer
   switch (smear_param.smear_type) {
   case QUDA_GAUGE_SMEAR_APE:
@@ -247,7 +247,7 @@ int main(int argc, char **argv)
     performGaugeSmearQuda(&smear_param, obs_param);
     break;
   }
-
+  
     // Here we use a typical use case which is different from simple smearing in that
     // the user will want to compute the plaquette values to compute the gauge energy.
   case QUDA_GAUGE_SMEAR_WILSON_FLOW:
@@ -255,7 +255,8 @@ int main(int argc, char **argv)
     for (int i = 0; i < gauge_smear_steps / measurement_interval + 1; i++) {
       obs_param[i].compute_plaquette = QUDA_BOOLEAN_TRUE;
     }
-    performGFlowQuda(check.data(),check_out.data(), &invParam, &smear_param, obs_param);
+    // performGFlowQuda(check.data(),check_out.data(), &invParam, &smear_param, obs_param);
+    performAdjGFlowSafe(check.data(),check_out.data(), &invParam, &smear_param, 3);
     break;
   }
   default: errorQuda("Undefined gauge smear type %d given", smear_param.smear_type);
