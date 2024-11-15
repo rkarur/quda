@@ -5596,7 +5596,52 @@ void adjSafeEvolve(std::vector<std::reference_wrapper<ColorSpinorField>> sf_list
 
 }    
     
+/* total_dist == n_steps, n_b is dividing factor of each block, n_Save is the size of the list*/
+std::vector<int> get_hier_list(int total_dist, int n_b, int n_save, bool front = true){
     
+    std::vector<int> hier_list;
+    int counter = 0;
+
+    int val = total_dist;
+    for (int i_s = 0; i_s < n_save; i_s++) {
+        val = (val <= 1) ? 1 : val / n_b;
+        hier_list.push_back(val);
+        counter += val;
+    }
+    
+    if (front) hier_list.at(0) += total_dist - counter;
+    else hier_list.back() += total_dist - counter;
+  
+    return hier_list;
+    
+}
+    
+int modify_hier_list(std::vector<int> &hier_list, int n_b, int n_save, int threshold) {
+    
+    int result = 0;
+    int current_size = hier_list.size();
+    std::vector<int> temp_list;
+    if (current_size > n_save) errorQuda("something isnt right\n");
+    
+    int diff = n_save - current_size;
+    
+    
+    for (int i=current_size - 1; i >= 0; --i){
+        
+        if (hier_list[i] > threshold){
+            
+            temp_list = get_hier_list(hier_list[i], n_b, diff+1,false);
+            // for (int ii = 0; ii< temp_list.size();ii++) printf("tempf %d \n",temp_list[ii]);
+            hier_list.erase(hier_list.begin()+i);
+            hier_list.insert(hier_list.begin()+i, temp_list.begin(),temp_list.end());
+            result = 1;
+            break;
+        } 
+    }
+    
+    return result;
+    
+}
     
 void performAdjGFlowNB(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaGaugeSmearParam *smear_param){
 
@@ -5703,27 +5748,43 @@ void performAdjGFlowNB(void *h_out, void *h_in, QudaInvertParam *inv_param, Quda
     
   
   int n_b = ceil(pow(1. * smear_param->n_steps, 1. / (smear_param->adj_n_save + 1) ));
-  n_b = 3;
-  int l_b_outer = smear_param->n_steps / n_b;  
-  std::vector<int> outer_dist(n_b);
-  std::fill(outer_dist.begin(), outer_dist.end(), l_b_outer);
-  outer_dist.at(outer_dist.size() - 1) = smear_param->n_steps - (n_b - 1) * l_b_outer;
-    
-  int end_of_block = smear_param->n_steps;
+  int ret_stat;
+  // n_b = 3;
   std::vector<int> hier_list;
-  printf("what is l_b_outer: %d \n",l_b_outer);
-  
-  bool start(true);
-    
-  for (int j = 0; j < outer_dist.size(); j++){
-      printf("starting outderdist element %d \n",hier_list.back());
-      for (int i = outer_dist[j]; i > 1; i = i/n_b) {
+  hier_list = get_hier_list(smear_param->n_steps, n_b,smear_param->adj_n_save - 1);
+  for (int i=0; i < hier_list.size(); i++) printf("content # %d of hier list = %d\n",i,hier_list[i]);
+  hier_list.pop_back(); 
+  ret_stat = modify_hier_list(hier_list, n_b, smear_param->adj_n_save - 1, 6);
+  for (int i=0; i < hier_list.size(); i++) printf("content # %d of newest hier list = %d\n",i,hier_list[i]);
+  hier_list.pop_back(); 
+  ret_stat = modify_hier_list(hier_list, n_b, smear_param->adj_n_save - 1, 6);
+  for (int i=0; i < hier_list.size(); i++) printf("content # %d of newest hier list = %d\n",i,hier_list[i]);
+//   int l_b_outer = smear_param->n_steps / n_b;  
+//   std::vector<int> outer_dist(n_b);
+//   std::fill(outer_dist.begin(), outer_dist.end(), l_b_outer);
+//   outer_dist.at(outer_dist.size() - 1) = smear_param->n_steps - (n_b - 1) * l_b_outer;
 
-          // if (start) {hier_list.push_back(l_b_outer - (i / n_b)); start = false;printf("first item of list: %d \n",hier_list.back());}
-          hier_list.push_back(i / n_b);
-          printf("number %d added to hier list\n",hier_list.back());
-      }
-  }  
+//   std::vector<std::vector<int>> hier_list(n_b);
+//   printf("n_b outer: %d, and l_b_outer: %d \n",n_b,l_b_outer);
+  
+  
+    
+//   for (int j = 0; j < outer_dist.size(); j++){
+//       printf("starting outderdist element of size %d \n",outer_dist[j]);
+//       int counter = 0;
+//       for (int i = outer_dist[j]; i > 1; i = i/n_b) {
+
+//           // if (start) {hier_list.push_back(l_b_outer - (i / n_b)); start = false;printf("first item of list: %d \n",hier_list.back());}
+//           if (i / n_b == 0) break;
+//           hier_list[j].push_back(i / n_b);
+//           printf("number %d added to hier list\n",hier_list[j].back());
+//           counter += i / n_b;
+//       }
+//       // hier_list[j].insert(hier_list[j].begin(),outer_dist[j] - counter);
+//       hier_list[j].at(0) += outer_dist[j] - counter;
+//       printf("beginning element modified to be %d \n",hier_list[j].front());
+//   }  
+  
   
     
 
