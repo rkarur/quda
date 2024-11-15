@@ -25,8 +25,9 @@ double gauge_smear_alpha = 0.6;
 double gauge_smear_alpha1 = 0.75;
 double gauge_smear_alpha2 = 0.6;
 double gauge_smear_alpha3 = 0.3;
-int gauge_smear_steps = 5;
+int gauge_smear_steps = 50;
 int gauge_n_save = 6;
+int gauge_n_hier_save = 3;
 QudaGaugeSmearType gauge_smear_type = QUDA_GAUGE_SMEAR_STOUT;
 int gauge_smear_dir_ignore = -1;
 int measurement_interval = 5;
@@ -198,6 +199,7 @@ int main(int argc, char **argv)
   smear_param.smear_type = gauge_smear_type;
   smear_param.n_steps = gauge_smear_steps;
   smear_param.adj_n_save = gauge_n_save;
+  smear_param.adj_n_hier_save = gauge_n_hier_save;
   smear_param.meas_interval = measurement_interval;
   smear_param.alpha = gauge_smear_alpha;
   smear_param.rho = gauge_smear_rho;
@@ -258,7 +260,7 @@ int main(int argc, char **argv)
       obs_param[i].compute_plaquette = QUDA_BOOLEAN_TRUE;
     }
     // performGFlowQuda(check.data(),check_out.data(), &invParam, &smear_param, obs_param);
-    performAdjGFlowSafe(check.data(),check_out.data(), &invParam, &smear_param, 3);
+    performAdjGFlowNB(check.data(),check_out.data(), &invParam, &smear_param);
     break;
   }
   default: errorQuda("Undefined gauge smear type %d given", smear_param.smear_type);

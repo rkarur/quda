@@ -3,6 +3,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
+#include <functional>
 #include <sys/time.h>
 
 #include <quda.h>
@@ -198,6 +199,8 @@ static TimeProfile profileGFlow("gFlowQuda");
 
 //!< Profiler for gFlowQuda
 static TimeProfile profileAdjGFlowSafe("AdjgFlowSafeQuda");
+
+static TimeProfile profileAdjGFlowNB("AdjgFlowNBQuda");
 
 //!< Profiler for projectSU3Quda
 static TimeProfile profileProject("projectSU3Quda");
@@ -5391,24 +5394,23 @@ void performAdjGFlowSafe(void *h_out, void *h_in, QudaInvertParam *inv_param, Qu
     freeUniqueGaugeQuda(QUDA_SMEARED_LINKS);
     gaugeSmeared = createExtendedGauge(*gaugePrecise, R, profileAdjGFlowSafe);
   }
-
+ 
   GaugeFieldParam gParamDummy(*gaugeSmeared);
   GaugeField gaugeW0(gParamDummy);
   GaugeField gaugeW1(gParamDummy);
   GaugeField gaugeW2(gParamDummy);
   GaugeField gaugeVT(gParamDummy);
-  GaugeField* gout_steps= new GaugeField[nsteps*3];
 
   GaugeFieldParam gParam(*gaugePrecise);
   gParam.reconstruct = QUDA_RECONSTRUCT_NO; // temporary field is not on manifold so cannot use reconstruct
   GaugeField gaugeTemp(gParam);
 
-  // GaugeField &g_in = *gaugeSmeared;
   GaugeField &g_W0 = *gaugeSmeared;
   GaugeField &g_W1 = gaugeW1;
   GaugeField &g_W2 = gaugeW2;
   GaugeField &g_VT = gaugeVT;
 
+  //necessary?
   if (gParamDummy.order <= 4) gParamDummy.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
 
   auto smear_type = QUDA_GAUGE_SMEAR_WILSON_FLOW;
@@ -5511,144 +5513,231 @@ void performAdjGFlowSafe(void *h_out, void *h_in, QudaInvertParam *inv_param, Qu
   popOutputPrefix();  
 }
 
-// void performAdjGFlowSafe(void *h_out, void *h_in, QudaInvertParam *inv_param, int nsteps)
-// {
-
-// printf("Stage 0 passed \n");    
-      
-// GaugeFieldParam gParamDummy(*gaugeSmeared);
-// GaugeField gaugeAux(gParamDummy);
-// GaugeField* gout_steps= new GaugeField[nsteps*3];
+void adjSafeEvolve(std::vector<std::reference_wrapper<ColorSpinorField>> sf_list,std::vector<std::reference_wrapper<GaugeField>> gf_list, QudaGaugeSmearParam *smear_param, unsigned int ns_safe, TimeProfile &profile)
+{ 
     
-// GaugeFieldParam gParam(*gaugePrecise);
-// gParam.reconstruct = QUDA_RECONSTRUCT_NO; // temporary field is not on manifold so cannot use reconstruct
-// GaugeField gaugeTemp(gParam);
-
-// GaugeField &g_in = *gaugeSmeared;
+  GaugeField &g_W0 = gf_list[0].get();
+  GaugeField &g_W1 = gf_list[1].get();
+  GaugeField &g_W2 = gf_list[2].get();
+  GaugeField &g_VT = gf_list[3].get();
+  GaugeField &gaugeTemp = gf_list[4].get();
+  GaugeField &precise =   gf_list[5].get();
     
-// if (gParamDummy.order <= 4) gParamDummy.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+  ColorSpinorField &fin = sf_list[0].get();
+  ColorSpinorField &fout = sf_list[1].get();
+  ColorSpinorField &f_temp0 = sf_list[2].get();
+  ColorSpinorField &f_temp1 = sf_list[3].get();
+  ColorSpinorField &f_temp2 = sf_list[4].get();
+  ColorSpinorField &f_temp3 = sf_list[5].get();
+  ColorSpinorField &f_temp4 = sf_list[6].get();  
     
-// auto smear_type = QUDA_GAUGE_SMEAR_WILSON_FLOW;
-    
-// // // Set the specific input parameters and create the cpu gauge field
-// // GaugeFieldParam gauge_param(&gParamDummy, g_in);
+  int parity = 0;
 
-// // if (gauge_param.order <= 4) gauge_param.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
-// // GaugeField *work_gauge_in = GaugeField::Create(gauge_param);
-
-
-// // = gaugeAux;
-//     printf("Stage 1 passed \n");
-//     for (int i = 0; i < nsteps; i++){
-//         for (int ss = 0; ss < 3; ss++){
-//             GaugeField *in = GaugeField::Create(gParamDummy);
-//             gout_steps[i*3 + ss] = *in;
-//         }
-//     }
-//     printf("Stage 2 passed \n");
-//     for (unsigned int i = 0; i < nsteps; i++) {
-//         if (i == 0)
-//             GFlowStep(gout_steps[i*3 + 0], gaugeTemp, g_in, 0.01, smear_type, WFLOW_STEP_W1);
-//         else
-//             GFlowStep(gout_steps[i*3 + 0], gaugeTemp, gout_steps[(i-1)*3 + 2], 0.01, smear_type, WFLOW_STEP_W1);
-        
-//         GFlowStep(gout_steps[i*3 + 1], gaugeTemp, gout_steps[i*3 + 0], 0.01, smear_type, WFLOW_STEP_W2);
-//         GFlowStep(gout_steps[i*3 + 2], gaugeTemp, gout_steps[i*3 + 1], 0.01, smear_type, WFLOW_STEP_VT);
-//     }
-    
-//   printf("Stage 3 passed \n");  
-//   // helper gauge field for Laplace operator
-//   GaugeField precise;
-//   GaugeFieldParam gParam_helper(*gaugePrecise);
-//   gParam_helper.create = QUDA_NULL_FIELD_CREATE;
-//   precise = GaugeField(gParam_helper);
-
-//   // spinor fields
-//   ColorSpinorParam cpuParam(h_in, *inv_param, gaugePrecise->X(), false, inv_param->input_location);
-//   ColorSpinorField fin_h(cpuParam);
-
-//   ColorSpinorParam deviceParam(cpuParam, *inv_param, QUDA_CUDA_FIELD_LOCATION);
-//   ColorSpinorField fin(deviceParam);
-//   fin = fin_h;
-
-//   deviceParam.create = QUDA_NULL_FIELD_CREATE;
-//   ColorSpinorField fout(deviceParam);
-
-//   int parity = 0;
-
-//   // initialize a and b for Laplace operator
-//   double a = 1.;
-//   double b = -8.;  
-    
-//   int comm_dim[4] = {};
-    
-//   // only switch on comms needed for directions with a derivative
-//   for (int i = 0; i < 4; i++) { comm_dim[i] = comm_dim_partitioned(i); }
-
-//   // auxilliary fermion fields [0], [1], [2] and [3]
-//   ColorSpinorField f_temp0(deviceParam);
-//   ColorSpinorField f_temp1(deviceParam);
-//   ColorSpinorField f_temp2(deviceParam);
-//   ColorSpinorField f_temp3(deviceParam);
-//   ColorSpinorField f_temp4(deviceParam);
-
-//   // set [3] = input spinor
-//   f_temp3 = fin;
-
-//   int measurement_n = 0; // The nth measurement to take
-    
-//   for (unsigned int i = nsteps - 1; i >= 0; i--) {
-//     //TODO: REPLACE
-//     // if (i > 0) std::swap(gin, gout); // output from prior step becomes input for next step
-
-//     // init auxilliary fields [0], [1] and [2] as [3]
-//     f_temp0 = f_temp3;
-//     f_temp1 = f_temp3;
-//     f_temp2 = f_temp3;
-      
-//     int index_g = i * 3;
-      
-//     copyExtendedGauge(precise, gout_steps[index_g + 2], QUDA_CUDA_FIELD_LOCATION);
-//     precise.exchangeGhost();
-//     ApplyLaplace(f_temp4, f_temp0, precise, 4, a, b, f_temp0, parity, false, comm_dim, profileGFlow);  
-      
-//     // f_temp0 = 3./4.*f_temp4;
-//     blas::ax(3. / 4., f_temp4);
-    
-//     f_temp2 = f_temp4;
-      
-//     copyExtendedGauge(precise, gout_steps[index_g + 1], QUDA_CUDA_FIELD_LOCATION);
-//     precise.exchangeGhost();  
-//     ApplyLaplace(f_temp4, f_temp2, precise, 4, a, b, f_temp2, parity, false, comm_dim, profileGFlow); 
-    
-      
-//     blas::axpy(8. / 9., f_temp4, f_temp3);
-    
-//     f_temp1 = f_temp3;
-//     f_temp4 = f_temp1;
-      
-//     blas::axpy(-8. / 9.,f_temp2, f_temp4);
-      
-//     copyExtendedGauge(precise, gout_steps[index_g + 0], QUDA_CUDA_FIELD_LOCATION);
-//     precise.exchangeGhost();  
-//     ApplyLaplace(f_temp0, f_temp4, precise, 4, a, b, f_temp4, parity, false, comm_dim, profileGFlow); 
-      
-//     blas::axpy(1.,f_temp2, f_temp0);
-//     blas::axpy(1.,f_temp1, f_temp0);
-    
-//     fout = f_temp0;
-//   }
-
-//   cpuParam.v = h_out;
-//   cpuParam.location = inv_param->output_location;
-//   ColorSpinorField fout_h(cpuParam);
-//   fout_h = fout;
-
-//   popOutputPrefix();  
+  // initialize a and b for Laplace operator
+  double a = 1.;
+  double b = -8.;  
   
+  int comm_dim[4] = {};
+  // only switch on comms needed for directions with a derivative
+  for (int i = 0; i < 4; i++) { comm_dim[i] = comm_dim_partitioned(i); }
+    
+  f_temp3 = fin;
+  f_temp0 = f_temp3;
+    
+  for (unsigned int j = 0; j < ns_safe ; j++)
+  {
+      for (unsigned int i = 0; i < ns_safe - j; i++) {
+          
+          if (i > 0) std::swap(g_W0,g_VT);
 
-// }
+          GFlowStep(g_W1, gaugeTemp, g_W0, smear_param->epsilon, smear_param->smear_type, WFLOW_STEP_W1);
+          GFlowStep(g_W2, gaugeTemp, g_W1, smear_param->epsilon, smear_param->smear_type, WFLOW_STEP_W2);
+          GFlowStep(g_VT, gaugeTemp, g_W2, smear_param->epsilon, smear_param->smear_type, WFLOW_STEP_VT);
 
+      }
+    // init auxilliary fields [0], [1] and [2] as [3]
+    f_temp0 = f_temp3;
+    f_temp1 = f_temp3;
+    f_temp2 = f_temp3;
+      
+    copyExtendedGauge(precise, g_W2, QUDA_CUDA_FIELD_LOCATION);
+    precise.exchangeGhost();
+    ApplyLaplace(f_temp4, f_temp0, precise, 4, a, b, f_temp0, parity, false, comm_dim, profileAdjGFlowNB);  
+      
+    // f_temp0 = 3./4.*f_temp4;
+    blas::ax(smear_param->epsilon * 3. / 4., f_temp4);
+    
+    f_temp2 = f_temp4;
+      
+    copyExtendedGauge(precise, g_W1, QUDA_CUDA_FIELD_LOCATION);
+    precise.exchangeGhost();  
+    ApplyLaplace(f_temp4, f_temp2, precise, 4, a, b, f_temp2, parity, false, comm_dim, profile); 
+    
+      
+    blas::axpy(smear_param->epsilon * 8. / 9., f_temp4, f_temp3);
+    
+    f_temp1 = f_temp3;
+    f_temp4 = f_temp1;
+      
+    blas::axpy(-8. / 9.,f_temp2, f_temp4);
+      
+    copyExtendedGauge(precise, g_W0, QUDA_CUDA_FIELD_LOCATION);
+    precise.exchangeGhost();  
+    ApplyLaplace(f_temp0, f_temp4, precise, 4, a, b, f_temp4, parity, false, comm_dim, profile); 
+    
+    blas::ax(smear_param->epsilon * 1. / 4., f_temp0);
+    blas::axpy(1.,f_temp2, f_temp0);
+    blas::axpy(1.,f_temp1, f_temp0);
+    
+    fout = f_temp0;
+    //redefining f_temp0 to restart loop
+    f_temp3 = f_temp0;
+  }
+
+}    
+    
+    
+    
+void performAdjGFlowNB(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaGaugeSmearParam *smear_param){
+
+  auto profile = pushProfile(profileAdjGFlowNB);
+  pushOutputPrefix("performAdjGFlowQudaNB: ");
+  checkGaugeSmearParam(smear_param);
+
+  // pushVerbosity(inv_param->verbosity);
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
+
+  if (smear_param->restart) {
+    if (gaugeSmeared == nullptr) errorQuda("gaugeSmeared must be loaded");
+  } else {
+    if (gaugePrecise == nullptr) errorQuda("Gauge field must be loaded");
+    freeUniqueGaugeQuda(QUDA_SMEARED_LINKS);
+    gaugeSmeared = createExtendedGauge(*gaugePrecise, R, profileAdjGFlowNB);
+  }
+ 
+  GaugeFieldParam gParamDummy(*gaugeSmeared);
+  GaugeField gaugeW0(gParamDummy);
+  GaugeField gaugeW1(gParamDummy);
+  GaugeField gaugeW2(gParamDummy);
+  GaugeField gaugeVT(gParamDummy);
+  GaugeField gauge_out(gParamDummy);
+
+  GaugeFieldParam gParam(*gaugePrecise);
+  gParam.reconstruct = QUDA_RECONSTRUCT_NO; // temporary field is not on manifold so cannot use reconstruct
+  GaugeField gaugeTemp(gParam);
+    
+  auto n = smear_param->adj_n_save;
+
+  std::vector<GaugeField> gauge_stages(n,gParamDummy);
+  //Can also do below
+  //creates copies std::vector<GaugeField> gauge_stages(n,*gaugeSmeared);
+    
+  GaugeField &gin = *gaugeSmeared;
+  GaugeField &gout = gauge_out;
+  
+  // helper gauge field for Laplace operator
+  GaugeField precise;
+  GaugeFieldParam gParam_helper(*gaugePrecise);
+  gParam_helper.create = QUDA_NULL_FIELD_CREATE;
+  precise = GaugeField(gParam_helper);
+
+  // spinor fields
+  ColorSpinorParam cpuParam(h_in, *inv_param, gaugePrecise->X(), false, inv_param->input_location);
+  ColorSpinorField fin_h(cpuParam);
+
+  ColorSpinorParam deviceParam(cpuParam, *inv_param, QUDA_CUDA_FIELD_LOCATION);
+  ColorSpinorField fin(deviceParam);
+  fin = fin_h;
+
+  deviceParam.create = QUDA_NULL_FIELD_CREATE;
+  ColorSpinorField fout(deviceParam);
+    
+  ColorSpinorField f_temp0(deviceParam);
+  ColorSpinorField f_temp1(deviceParam);
+  ColorSpinorField f_temp2(deviceParam);
+  ColorSpinorField f_temp3(deviceParam);
+  ColorSpinorField f_temp4(deviceParam);
+    
+  
+  unsigned int block_length = smear_param->n_steps / smear_param->adj_n_save;
+  int block_counter = 0;
+  std::vector<int> dist_save(smear_param->adj_n_save);
+  std::fill(dist_save.begin(), dist_save.end(), block_length);
+  dist_save.at(dist_save.size() - 1) = smear_param->n_steps - (smear_param->adj_n_save - 1) * block_length;
+    
+  for (unsigned int i = 0; i < smear_param->adj_n_save; i++)  printf("evolve distance of %d added \n",dist_save[i]); 
+    
+  for (unsigned int i = 0; i < smear_param->adj_n_save; i++) {
+      
+      gauge_stages[i] = gout;    
+      for (unsigned int j = 0; j < block_length; j++){
+          if (i > 0) std::swap(gout,gin);
+          WFlowStep(gout, gaugeTemp, gin, smear_param->epsilon, smear_param->smear_type);
+      }
+      
+//       if (i == smear_param->adj_n_save - 1 ) {
+//           dist_save.push_back(smear_param->n_steps - block_counter); 
+//       }
+//       else {
+          
+//           dist_save.push_back(block_length);
+//       }
+//       block_counter += block_length;
+
+      // printf("evolve distance of %d added \n",dist_save.back());
+      
+  }
+  std::vector<std::reference_wrapper<ColorSpinorField>> sf_list;
+  sf_list = {fin, fout, f_temp0, f_temp1, f_temp2, f_temp3, f_temp4};
+  std::vector<std::reference_wrapper<GaugeField>> gf_list;  
+  gf_list = {gauge_stages.back(), gaugeW1, gaugeW2, gaugeVT, gaugeTemp, precise};
+  for (int i = gauge_stages.size() - 1; i >= 0; --i) {
+     //first load correct gauge field (for beginning of the loop, it is the final gauge list element) 
+     if (i < gauge_stages.size() - 1) gf_list.at(0) = std::ref(gauge_stages[i]); 
+     
+     adjSafeEvolve(sf_list,gf_list,smear_param,dist_save[i],profileAdjGFlowNB);
+      
+     logQuda(QUDA_SUMMARIZE," block number %d successfully deployed \n",i);
+     std::swap(sf_list[0],sf_list[1]);
+    }
+    
+  
+  int n_b = ceil(pow(1. * smear_param->n_steps, 1. / (smear_param->adj_n_save + 1) ));
+  n_b = 3;
+  int l_b_outer = smear_param->n_steps / n_b;  
+  std::vector<int> outer_dist(n_b);
+  std::fill(outer_dist.begin(), outer_dist.end(), l_b_outer);
+  outer_dist.at(outer_dist.size() - 1) = smear_param->n_steps - (n_b - 1) * l_b_outer;
+    
+  int end_of_block = smear_param->n_steps;
+  std::vector<int> hier_list;
+  printf("what is l_b_outer: %d \n",l_b_outer);
+  
+  bool start(true);
+    
+  for (int j = 0; j < outer_dist.size(); j++){
+      printf("starting outderdist element %d \n",hier_list.back());
+      for (int i = outer_dist[j]; i > 1; i = i/n_b) {
+
+          // if (start) {hier_list.push_back(l_b_outer - (i / n_b)); start = false;printf("first item of list: %d \n",hier_list.back());}
+          hier_list.push_back(i / n_b);
+          printf("number %d added to hier list\n",hier_list.back());
+      }
+  }  
+  
+    
+
+  cpuParam.v = h_out;
+  cpuParam.location = inv_param->output_location;
+  ColorSpinorField fout_h(cpuParam);
+  fout_h = sf_list[1].get();
+    
+  popOutputPrefix();
+    
+}
+
+
+    
     
 /* save list of gauge vectors */
 
