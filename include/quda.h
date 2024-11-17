@@ -1716,6 +1716,16 @@ extern "C" {
    * observables we are making and the resulting observables.
    */  
   void performAdjGFlowNB(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaGaugeSmearParam *smear_param);
+    
+  /**
+   * Performs Adjoint Gradient Flow (gauge + fermion) the Hierarchical way on gaugePrecise and stores it in gaugeSmeared
+   * @param[out] h_out Output fermion field
+   * @param[in] h_in Input fermion field
+   * @param[in] smear_param Parameter struct that defines the computation parameters
+   * @param[in,out] obs_param Parameter struct that defines which
+   * observables we are making and the resulting observables.
+   */  
+  void performAdjGFlowHier(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaGaugeSmearParam *smear_param);
 
   /**
    * @brief Calculates a variety of gauge-field observables.  If a

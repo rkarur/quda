@@ -202,6 +202,8 @@ static TimeProfile profileAdjGFlowSafe("AdjgFlowSafeQuda");
 
 static TimeProfile profileAdjGFlowNB("AdjgFlowNBQuda");
 
+static TimeProfile profileAdjGFlowHier("AdjgFlowHierQuda");
+
 //!< Profiler for projectSU3Quda
 static TimeProfile profileProject("projectSU3Quda");
 
@@ -5562,7 +5564,7 @@ void adjSafeEvolve(std::vector<std::reference_wrapper<ColorSpinorField>> sf_list
       
     copyExtendedGauge(precise, g_W2, QUDA_CUDA_FIELD_LOCATION);
     precise.exchangeGhost();
-    ApplyLaplace(f_temp4, f_temp0, precise, 4, a, b, f_temp0, parity, false, comm_dim, profileAdjGFlowNB);  
+    ApplyLaplace(f_temp4, f_temp0, precise, 4, a, b, f_temp0, parity, false, comm_dim, profile);  
       
     // f_temp0 = 3./4.*f_temp4;
     blas::ax(smear_param->epsilon * 3. / 4., f_temp4);
@@ -5618,7 +5620,7 @@ std::vector<int> get_hier_list(int total_dist, int n_b, int n_save, bool front =
     
 int modify_hier_list(std::vector<int> &hier_list, int n_b, int n_save, int threshold) {
     
-    int result = 0;
+    int result = -1;
     int current_size = hier_list.size();
     std::vector<int> temp_list;
     if (current_size > n_save) errorQuda("something isnt right\n");
@@ -5627,14 +5629,14 @@ int modify_hier_list(std::vector<int> &hier_list, int n_b, int n_save, int thres
     
     
     for (int i=current_size - 1; i >= 0; --i){
-        
+
         if (hier_list[i] > threshold){
             
             temp_list = get_hier_list(hier_list[i], n_b, diff+1,false);
             // for (int ii = 0; ii< temp_list.size();ii++) printf("tempf %d \n",temp_list[ii]);
             hier_list.erase(hier_list.begin()+i);
             hier_list.insert(hier_list.begin()+i, temp_list.begin(),temp_list.end());
-            result = 1;
+            result = i;
             break;
         } 
     }
@@ -5720,22 +5722,13 @@ void performAdjGFlowNB(void *h_out, void *h_in, QudaInvertParam *inv_param, Quda
           WFlowStep(gout, gaugeTemp, gin, smear_param->epsilon, smear_param->smear_type);
       }
       
-//       if (i == smear_param->adj_n_save - 1 ) {
-//           dist_save.push_back(smear_param->n_steps - block_counter); 
-//       }
-//       else {
-          
-//           dist_save.push_back(block_length);
-//       }
-//       block_counter += block_length;
-
-      // printf("evolve distance of %d added \n",dist_save.back());
-      
   }
   std::vector<std::reference_wrapper<ColorSpinorField>> sf_list;
   sf_list = {fin, fout, f_temp0, f_temp1, f_temp2, f_temp3, f_temp4};
   std::vector<std::reference_wrapper<GaugeField>> gf_list;  
   gf_list = {gauge_stages.back(), gaugeW1, gaugeW2, gaugeVT, gaugeTemp, precise};
+    
+
   for (int i = gauge_stages.size() - 1; i >= 0; --i) {
      //first load correct gauge field (for beginning of the loop, it is the final gauge list element) 
      if (i < gauge_stages.size() - 1) gf_list.at(0) = std::ref(gauge_stages[i]); 
@@ -5748,45 +5741,20 @@ void performAdjGFlowNB(void *h_out, void *h_in, QudaInvertParam *inv_param, Quda
     
   
   int n_b = ceil(pow(1. * smear_param->n_steps, 1. / (smear_param->adj_n_save + 1) ));
+  int element_back;
   int ret_stat;
+  std::vector<int> gauge_list{1,2,3,4,5};
   // n_b = 3;
   std::vector<int> hier_list;
   hier_list = get_hier_list(smear_param->n_steps, n_b,smear_param->adj_n_save - 1);
   for (int i=0; i < hier_list.size(); i++) printf("content # %d of hier list = %d\n",i,hier_list[i]);
-  hier_list.pop_back(); 
+  hier_list.pop_back();
   ret_stat = modify_hier_list(hier_list, n_b, smear_param->adj_n_save - 1, 6);
+  element_back = gauge_list.back();
+  gauge_list.pop_back();
+  gauge_list.insert(gauge_list.begin()+ret_stat+1,element_back);
   for (int i=0; i < hier_list.size(); i++) printf("content # %d of newest hier list = %d\n",i,hier_list[i]);
-  hier_list.pop_back(); 
-  ret_stat = modify_hier_list(hier_list, n_b, smear_param->adj_n_save - 1, 6);
-  for (int i=0; i < hier_list.size(); i++) printf("content # %d of newest hier list = %d\n",i,hier_list[i]);
-//   int l_b_outer = smear_param->n_steps / n_b;  
-//   std::vector<int> outer_dist(n_b);
-//   std::fill(outer_dist.begin(), outer_dist.end(), l_b_outer);
-//   outer_dist.at(outer_dist.size() - 1) = smear_param->n_steps - (n_b - 1) * l_b_outer;
-
-//   std::vector<std::vector<int>> hier_list(n_b);
-//   printf("n_b outer: %d, and l_b_outer: %d \n",n_b,l_b_outer);
-  
-  
-    
-//   for (int j = 0; j < outer_dist.size(); j++){
-//       printf("starting outderdist element of size %d \n",outer_dist[j]);
-//       int counter = 0;
-//       for (int i = outer_dist[j]; i > 1; i = i/n_b) {
-
-//           // if (start) {hier_list.push_back(l_b_outer - (i / n_b)); start = false;printf("first item of list: %d \n",hier_list.back());}
-//           if (i / n_b == 0) break;
-//           hier_list[j].push_back(i / n_b);
-//           printf("number %d added to hier list\n",hier_list[j].back());
-//           counter += i / n_b;
-//       }
-//       // hier_list[j].insert(hier_list[j].begin(),outer_dist[j] - counter);
-//       hier_list[j].at(0) += outer_dist[j] - counter;
-//       printf("beginning element modified to be %d \n",hier_list[j].front());
-//   }  
-  
-  
-    
+  for (int i=0; i < hier_list.size(); i++) printf("content # %d of newest gauge list = %d\n",i,gauge_list[i]);
 
   cpuParam.v = h_out;
   cpuParam.location = inv_param->output_location;
@@ -5797,7 +5765,154 @@ void performAdjGFlowNB(void *h_out, void *h_in, QudaInvertParam *inv_param, Quda
     
 }
 
+void performAdjGFlowHier(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaGaugeSmearParam *smear_param){
 
+  auto profile = pushProfile(profileAdjGFlowHier);
+  pushOutputPrefix("performAdjGFlowQudaHier: ");
+  checkGaugeSmearParam(smear_param);
+
+  // pushVerbosity(inv_param->verbosity);
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
+
+  if (smear_param->restart) {
+    if (gaugeSmeared == nullptr) errorQuda("gaugeSmeared must be loaded");
+  } else {
+    if (gaugePrecise == nullptr) errorQuda("Gauge field must be loaded");
+    freeUniqueGaugeQuda(QUDA_SMEARED_LINKS);
+    gaugeSmeared = createExtendedGauge(*gaugePrecise, R, profileAdjGFlowHier);
+  }
+ 
+  GaugeFieldParam gParamDummy(*gaugeSmeared);
+  GaugeField gaugeW0(gParamDummy);
+  GaugeField gaugeW1(gParamDummy);
+  GaugeField gaugeW2(gParamDummy);
+  GaugeField gaugeVT(gParamDummy);
+  GaugeField gauge_out(gParamDummy);
+
+  GaugeFieldParam gParam(*gaugePrecise);
+  gParam.reconstruct = QUDA_RECONSTRUCT_NO; // temporary field is not on manifold so cannot use reconstruct
+  GaugeField gaugeTemp(gParam);
+    
+  auto n = smear_param->adj_n_save;
+
+  std::vector<GaugeField> gauge_stages(n,gParamDummy);
+  gauge_stages[0] = *gaugeSmeared;
+  //Can also do below
+  //creates copies std::vector<GaugeField> gauge_stages(n,*gaugeSmeared);
+    
+  GaugeField &gin = *gaugeSmeared;
+  GaugeField &gout = gauge_out;
+  
+  // helper gauge field for Laplace operator
+  GaugeField precise;
+  GaugeFieldParam gParam_helper(*gaugePrecise);
+  gParam_helper.create = QUDA_NULL_FIELD_CREATE;
+  precise = GaugeField(gParam_helper);
+
+  // spinor fields
+  ColorSpinorParam cpuParam(h_in, *inv_param, gaugePrecise->X(), false, inv_param->input_location);
+  ColorSpinorField fin_h(cpuParam);
+
+  ColorSpinorParam deviceParam(cpuParam, *inv_param, QUDA_CUDA_FIELD_LOCATION);
+  ColorSpinorField fin(deviceParam);
+  fin = fin_h;
+
+  deviceParam.create = QUDA_NULL_FIELD_CREATE;
+  ColorSpinorField fout(deviceParam);
+    
+  ColorSpinorField f_temp0(deviceParam);
+  ColorSpinorField f_temp1(deviceParam);
+  ColorSpinorField f_temp2(deviceParam);
+  ColorSpinorField f_temp3(deviceParam);
+  ColorSpinorField f_temp4(deviceParam);
+    
+  int n_b = ceil(pow(1. * smear_param->n_steps, 1. / (smear_param->adj_n_save + 1) ));
+  int ret_idx = 0;
+  int threshold = 6;
+  std::vector<int> hier_list;
+  //The first stage is saved at the very beginning, so its presence is implicit
+  hier_list = get_hier_list(smear_param->n_steps, n_b,smear_param->adj_n_save);
+ 
+  if (threshold < hier_list.back()) threshold = hier_list.back();
+  
+  if (hier_list.empty()) errorQuda("hier_list is not populated\n");
+  if (hier_list.size() != gauge_stages.size()) errorQuda("hier_list is not same size as gauge_stages \n");
+    
+  for (unsigned int i = 0; i < hier_list.size(); i++) {
+          
+      for (unsigned int j = 0; j < hier_list[i]; j++){
+          if (i > 0) std::swap(gout,gin);
+          WFlowStep(gout, gaugeTemp, gin, smear_param->epsilon, smear_param->smear_type);
+      }
+      if (i == 0)
+      gauge_stages[0] = gin;
+      else
+      gauge_stages[i] = gout;
+  }
+    
+  std::vector<std::reference_wrapper<ColorSpinorField>> sf_list;
+  sf_list = {fin, fout, f_temp0, f_temp1, f_temp2, f_temp3, f_temp4};
+  std::vector<std::reference_wrapper<GaugeField>> gf_list;  
+  gf_list = {gauge_stages.back(), gaugeW1, gaugeW2, gaugeVT, gaugeTemp, precise};
+  
+ 
+  while (ret_idx != -1){
+      
+      adjSafeEvolve(sf_list,gf_list,smear_param,hier_list.back(),profileAdjGFlowHier);
+      std::swap(sf_list[0],sf_list[1]);
+      // break;
+      hier_list.pop_back();
+      gauge_stages.pop_back();
+      ret_idx = modify_hier_list(hier_list, n_b, smear_param->adj_n_save, threshold);
+      if (ret_idx == -1) {
+          
+          for (int i = gauge_stages.size() - 1; i >= 0; --i) {
+             //first load correct gauge field (for beginning of the loop, it is the final gauge list element) 
+             gf_list.at(0) = std::ref(gauge_stages[i]); 
+
+             adjSafeEvolve(sf_list,gf_list,smear_param,hier_list[i],profileAdjGFlowNB);
+
+             logQuda(QUDA_SUMMARIZE," block number %d successfully deployed \n",i);
+             // At final step, we do not conduct swap
+             if (i != 0) std::swap(sf_list[0],sf_list[1]);
+            }
+          
+          break;
+      }
+      
+      GaugeField g_2(gParamDummy);
+      GaugeField g_1 = gauge_stages[ret_idx];
+      
+      for (unsigned int j = 0; j < hier_list[ret_idx]; j++){
+          if (j > 0) std::swap(g_2,g_1);
+          WFlowStep(g_2, gaugeTemp, g_1, smear_param->epsilon, smear_param->smear_type);
+      }
+      // break;
+      gauge_stages.insert(gauge_stages.begin() + ret_idx + 1, g_2);
+      gf_list.at(0) = std::ref(gauge_stages.back());
+      
+      printf("hier list size : %d \n",hier_list.size());
+      
+      
+  }
+    
+//   adjSafeEvolve(sf_list,gf_list,smear_param,hier_list.back(),profileAdjGFlowHier);
+//       std::swap(sf_list[0],sf_list[1]);
+// hier_list.pop_back();
+// //       gauge_stages.pop_back();
+// //       ret_idx = modify_hier_list(hier_list, n_b, smear_param->adj_n_save, threshold);
+//   adjSafeEvolve(sf_list,gf_list,smear_param,hier_list.back(),profileAdjGFlowHier);
+    
+    
+    
+  cpuParam.v = h_out;
+  cpuParam.location = inv_param->output_location;
+  ColorSpinorField fout_h(cpuParam);
+  fout_h = sf_list[1].get();
+    
+  popOutputPrefix();
+
+}
     
     
 /* save list of gauge vectors */

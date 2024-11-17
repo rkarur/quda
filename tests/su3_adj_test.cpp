@@ -260,7 +260,7 @@ int main(int argc, char **argv)
       obs_param[i].compute_plaquette = QUDA_BOOLEAN_TRUE;
     }
     // performGFlowQuda(check.data(),check_out.data(), &invParam, &smear_param, obs_param);
-    performAdjGFlowNB(check.data(),check_out.data(), &invParam, &smear_param);
+    performAdjGFlowHier(check.data(),check_out.data(), &invParam, &smear_param);
     break;
   }
   default: errorQuda("Undefined gauge smear type %d given", smear_param.smear_type);
