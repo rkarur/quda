@@ -154,7 +154,7 @@ namespace quda {
 
   template <typename Float> void genericPrintMatrix(const GaugeField &a, int d, int parity, unsigned int x_cb)
   {
-    genericPrintMatrix<Float>(a, d, parity, x_cb, IntList<@QUDA_MULTIGRID_NC_NVEC_LIST @>());
+    genericPrintMatrix<Float>(a, d, parity, x_cb, IntList<@QUDA_MULTIGRID_NC_NVEC_LIST@>());
   }
 
   void genericPrintMatrix(const GaugeField &a, int d, int parity, unsigned int x_cb, int rank)
