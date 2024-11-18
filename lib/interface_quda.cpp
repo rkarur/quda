@@ -5748,6 +5748,28 @@ void performAdjGFlowNB(void *h_out, void *h_in, QudaInvertParam *inv_param, Quda
   std::vector<int> hier_list;
   hier_list = get_hier_list(smear_param->n_steps, n_b,smear_param->adj_n_save - 1);
   for (int i=0; i < hier_list.size(); i++) printf("content # %d of hier list = %d\n",i,hier_list[i]);
+    
+    
+  hier_list.pop_back();
+  ret_stat = modify_hier_list(hier_list, n_b, smear_param->adj_n_save - 1, 6);
+  element_back = gauge_list.back();
+  gauge_list.pop_back();
+  gauge_list.insert(gauge_list.begin()+ret_stat+1,element_back);
+  for (int i=0; i < hier_list.size(); i++) printf("content # %d of newest hier list = %d\n",i,hier_list[i]);
+  for (int i=0; i < hier_list.size(); i++) printf("content # %d of newest gauge list = %d\n",i,gauge_list[i]);
+    
+    
+    
+  hier_list.pop_back();
+  ret_stat = modify_hier_list(hier_list, n_b, smear_param->adj_n_save - 1, 6);
+  element_back = gauge_list.back();
+  gauge_list.pop_back();
+  gauge_list.insert(gauge_list.begin()+ret_stat+1,element_back);
+  for (int i=0; i < hier_list.size(); i++) printf("content # %d of newest hier list = %d\n",i,hier_list[i]);
+  for (int i=0; i < hier_list.size(); i++) printf("content # %d of newest gauge list = %d\n",i,gauge_list[i]);
+
+    
+    
   hier_list.pop_back();
   ret_stat = modify_hier_list(hier_list, n_b, smear_param->adj_n_save - 1, 6);
   element_back = gauge_list.back();
@@ -5827,6 +5849,7 @@ void performAdjGFlowHier(void *h_out, void *h_in, QudaInvertParam *inv_param, Qu
   ColorSpinorField f_temp4(deviceParam);
     
   int n_b = ceil(pow(1. * smear_param->n_steps, 1. / (smear_param->adj_n_save + 1) ));
+  logQuda(QUDA_VERBOSE,"Hierarchical block n_b: %d\n\n",n_b);
   int ret_idx = 0;
   int threshold = 6;
   std::vector<int> hier_list;
@@ -5857,22 +5880,27 @@ void performAdjGFlowHier(void *h_out, void *h_in, QudaInvertParam *inv_param, Qu
   
  
   while (ret_idx != -1){
+      logQuda(QUDA_VERBOSE,"Starting a hierarchical loop log\n");
       
       adjSafeEvolve(sf_list,gf_list,smear_param,hier_list.back(),profileAdjGFlowHier);
       std::swap(sf_list[0],sf_list[1]);
-      // break;
+      
+      for (int j = 0; j < hier_list.size(); j++ ){
+          logQuda(QUDA_VERBOSE,"previous hier list element %d : %ld \n",j,hier_list[j]);
+      }
+      logQuda(QUDA_VERBOSE,"\n");
       hier_list.pop_back();
       gauge_stages.pop_back();
       ret_idx = modify_hier_list(hier_list, n_b, smear_param->adj_n_save, threshold);
       if (ret_idx == -1) {
-          
+          logQuda(QUDA_DEBUG_VERBOSE," now in final serial stage of hierarchial evolution \n");
           for (int i = gauge_stages.size() - 1; i >= 0; --i) {
              //first load correct gauge field (for beginning of the loop, it is the final gauge list element) 
              gf_list.at(0) = std::ref(gauge_stages[i]); 
 
-             adjSafeEvolve(sf_list,gf_list,smear_param,hier_list[i],profileAdjGFlowNB);
+             adjSafeEvolve(sf_list,gf_list,smear_param,hier_list[i],profileAdjGFlowHier);
 
-             logQuda(QUDA_SUMMARIZE," block number %d successfully deployed \n",i);
+             logQuda(QUDA_DEBUG_VERBOSE," block number %d successfully deployed \n",i);
              // At final step, we do not conduct swap
              if (i != 0) std::swap(sf_list[0],sf_list[1]);
             }
@@ -5883,26 +5911,24 @@ void performAdjGFlowHier(void *h_out, void *h_in, QudaInvertParam *inv_param, Qu
       GaugeField g_2(gParamDummy);
       GaugeField g_1 = gauge_stages[ret_idx];
       
+      for (int j = 0; j < hier_list.size(); j++ ){
+          logQuda(QUDA_VERBOSE,"modified hier list element %d : %ld \n",j,hier_list[j]);
+      }
+      
+      logQuda(QUDA_VERBOSE,"ret idx : %d \n",ret_idx);
+      
       for (unsigned int j = 0; j < hier_list[ret_idx]; j++){
           if (j > 0) std::swap(g_2,g_1);
           WFlowStep(g_2, gaugeTemp, g_1, smear_param->epsilon, smear_param->smear_type);
       }
       // break;
       gauge_stages.insert(gauge_stages.begin() + ret_idx + 1, g_2);
+      logQuda(QUDA_VERBOSE,"recycled gauge field placed *before* index %d\n\n\n",ret_idx + 1);
       gf_list.at(0) = std::ref(gauge_stages.back());
       
-      printf("hier list size : %d \n",hier_list.size());
       
-      
+   
   }
-    
-//   adjSafeEvolve(sf_list,gf_list,smear_param,hier_list.back(),profileAdjGFlowHier);
-//       std::swap(sf_list[0],sf_list[1]);
-// hier_list.pop_back();
-// //       gauge_stages.pop_back();
-// //       ret_idx = modify_hier_list(hier_list, n_b, smear_param->adj_n_save, threshold);
-//   adjSafeEvolve(sf_list,gf_list,smear_param,hier_list.back(),profileAdjGFlowHier);
-    
     
     
   cpuParam.v = h_out;
