@@ -5848,7 +5848,7 @@ void performAdjGFlowHier(void *h_out, void *h_in, QudaInvertParam *inv_param, Qu
   int n_b = ceil(pow(1. * smear_param->n_steps, 1. / (smear_param->adj_n_save + 1) ));
   logQuda(QUDA_VERBOSE,"Hierarchical block n_b: %d\n\n",n_b);
   int ret_idx = 0;
-  int threshold = 6;
+  int threshold = smear_param->hier_threshold;
   std::vector<int> hier_list;
   //The first stage is saved at the very beginning, so its presence is implicit
   hier_list = get_hier_list(smear_param->n_steps, n_b,smear_param->adj_n_save);
