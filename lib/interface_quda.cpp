@@ -5598,7 +5598,7 @@ void adjSafeEvolve(std::vector<std::reference_wrapper<ColorSpinorField>> sf_list
 
 }    
     
-/* total_dist == n_steps, n_b is dividing factor of each block, n_Save is the size of the list*/
+/* total_dist == n_steps, n_b is dividing factor of each block, n_Save is the size of the list, "front" denotes whether split hierarchy goes to existing or new subhierarchy */
 std::vector<int> get_hier_list(int total_dist, int n_b, int n_save, bool front = true){
     
     std::vector<int> hier_list;
@@ -5893,18 +5893,18 @@ void performAdjGFlowHier(void *h_out, void *h_in, QudaInvertParam *inv_param, Qu
       gauge_stages.pop_back();
       ret_idx = modify_hier_list(hier_list, n_b, smear_param->adj_n_save, threshold);
       if (ret_idx == -1) {
-          logQuda(QUDA_DEBUG_VERBOSE," now in final serial stage of hierarchial evolution \n");
+          logQuda(QUDA_VERBOSE," now in final serial stage of hierarchial evolution \n");
           for (int i = gauge_stages.size() - 1; i >= 0; --i) {
              //first load correct gauge field (for beginning of the loop, it is the final gauge list element) 
              gf_list.at(0) = std::ref(gauge_stages[i]); 
 
              adjSafeEvolve(sf_list,gf_list,smear_param,hier_list[i],profileAdjGFlowHier);
 
-             logQuda(QUDA_DEBUG_VERBOSE," block number %d successfully deployed \n",i);
+             logQuda(QUDA_VERBOSE," block number %d successfully deployed \n",i);
              // At final step, we do not conduct swap
              if (i != 0) std::swap(sf_list[0],sf_list[1]);
             }
-          
+          logQuda(QUDA_VERBOSE," hierarchial evolution completed \n");
           break;
       }
       
