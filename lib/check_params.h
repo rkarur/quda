@@ -1175,6 +1175,8 @@ void printQudaGaugeSmearParam(QudaGaugeSmearParam *param)
   P(rho, 0.0);
   P(epsilon, 0.0);
   P(restart, QUDA_BOOLEAN_FALSE);
+  P(adj_n_save,5);
+  P(hier_threshold,6);
   P(t0, 0.0);
   P(alpha1, 0.0);
   P(alpha2, 0.0);
@@ -1187,6 +1189,8 @@ void printQudaGaugeSmearParam(QudaGaugeSmearParam *param)
   P(rho, INVALID_DOUBLE);
   P(epsilon, INVALID_DOUBLE);
   P(restart, QUDA_BOOLEAN_INVALID);
+  P(adj_n_save,(unsigned int)INVALID_INT);
+  P(hier_threshold,(unsigned int)INVALID_INT);
   P(t0, INVALID_DOUBLE);
   P(alpha1, INVALID_DOUBLE);
   P(alpha2, INVALID_DOUBLE);

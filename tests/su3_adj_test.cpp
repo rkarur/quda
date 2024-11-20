@@ -27,7 +27,6 @@ double gauge_smear_alpha2 = 0.6;
 double gauge_smear_alpha3 = 0.3;
 int gauge_smear_steps = 50;
 int gauge_n_save = 3;
-int gauge_n_hier_save = 3;
 int hier_threshold = 6;
 QudaGaugeSmearType gauge_smear_type = QUDA_GAUGE_SMEAR_STOUT;
 int gauge_smear_dir_ignore = -1;
@@ -109,7 +108,7 @@ void add_su3_option_group(std::shared_ptr<QUDAApp> quda_app)
     
   opgroup->add_option("--su3-adj-gauge-nsave", gauge_n_save, "The number of gauge steps to save for hierarchical adj grad flow");
     
-  opgroup->add_option("--su3-hier_threshold", hier_threshold, "Minimum threshold for hierarchical adj grad flow");
+  opgroup->add_option("--su3-hier-threshold", hier_threshold, "Minimum threshold for hierarchical adj grad flow");
 
   opgroup->add_option("--su3-measurement-interval", measurement_interval,
                       "Measure the field energy and/or topological charge every Nth step (default 5) ");
@@ -204,7 +203,6 @@ int main(int argc, char **argv)
   smear_param.smear_type = gauge_smear_type;
   smear_param.n_steps = gauge_smear_steps;
   smear_param.adj_n_save = gauge_n_save;
-  smear_param.adj_n_hier_save = gauge_n_hier_save;
   smear_param.hier_threshold = hier_threshold;
   smear_param.meas_interval = measurement_interval;
   smear_param.alpha = gauge_smear_alpha;
@@ -215,7 +213,7 @@ int main(int argc, char **argv)
   smear_param.alpha3 = gauge_smear_alpha3;
   smear_param.dir_ignore = gauge_smear_dir_ignore;
 
-  quda::ColorSpinorField check,check_out;  
+  quda::ColorSpinorField check,check_out,check_out1;  
   QudaInvertParam invParam = newQudaInvertParam();
   invParam.cpu_prec = QUDA_DOUBLE_PRECISION;
   invParam.cuda_prec = QUDA_DOUBLE_PRECISION;
@@ -241,11 +239,17 @@ int main(int argc, char **argv)
       
   constructWilsonTestSpinorParam(&cs_param, &invParam, &gauge_param);
   check = quda::ColorSpinorField(cs_param);
+    //Add noise to spinor
+  quda::RNG rng(check, 1234);
+  spinorNoise(check, rng, QUDA_NOISE_GAUSS);
+  
   // constructWilsonTestSpinorParam(&cs_param_out, &invParam, &gauge_param);
   check_out = quda::ColorSpinorField(cs_param);
+  check_out1 = quda::ColorSpinorField(cs_param);
     // constructWilsonTestSpinorParam(&cs_param, &inv_param, &gauge_param);
-  
-    
+  check.PrintVector(0,0,0);
+  check_out.PrintVector(0,0,0);
+    check_out1.PrintVector(0,0,0);
   // quda::ColorSpinorField rngDummy(cs_param), rngDummy1(cs_param_out);
   printf("Stage -1 passed\n");  
   host_timer.start(); // start the timer
@@ -266,13 +270,25 @@ int main(int argc, char **argv)
       obs_param[i].compute_plaquette = QUDA_BOOLEAN_TRUE;
     }
     // performGFlowQuda(check.data(),check_out.data(), &invParam, &smear_param, obs_param);
-    performAdjGFlowHier(check.data(),check_out.data(), &invParam, &smear_param);
+    performAdjGFlowHier(check_out1.data(),check.data(), &invParam, &smear_param);
+    performAdjGFlowSafe(check_out.data(),check.data(), &invParam, &smear_param, 50);
+      
+    
     break;
   }
   default: errorQuda("Undefined gauge smear type %d given", smear_param.smear_type);
   }
 
   host_timer.stop(); // stop the timer
+    
+    printf("Original spinor\n:");
+  check.PrintVector(0,0,0);
+    printf("Hierarchical method\n:");
+  check_out1.PrintVector(0,0,0);
+    
+    printf("Safe method\n:");
+  check_out.PrintVector(0,0,0);
+    
   printfQuda("Total time for gauge smearing = %g secs\n", host_timer.last());
 
   if (verify_results) check_gauge(gauge, new_gauge, 1e-3, gauge_param.cpu_prec);

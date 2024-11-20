@@ -863,7 +863,6 @@ extern "C" {
     unsigned int meas_interval;    /**< Perform the requested measurements on the gauge field at this interval */
     QudaGaugeSmearType smear_type; /**< The smearing type to perform */
     unsigned int adj_n_save;       /**< How many intermediate gauge fields to save at each large nblock to perform adj flow*/
-    unsigned int adj_n_hier_save;  /**< How many *hierarchical* intermediate gauge fields to save to perform adj flow*/
     unsigned int hier_threshold;   /**< Minimum *hierarchical* threshold for adj gradient flow*/
     QudaBoolean restart;           /**< Used to restart the smearing from existing gaugeSmeared */
     double t0;                     /**< Starting flow time for Wilson flow */
