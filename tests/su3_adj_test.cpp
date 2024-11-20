@@ -271,7 +271,7 @@ int main(int argc, char **argv)
     }
     // performGFlowQuda(check.data(),check_out.data(), &invParam, &smear_param, obs_param);
     performAdjGFlowHier(check_out1.data(),check.data(), &invParam, &smear_param);
-    performAdjGFlowSafe(check_out.data(),check.data(), &invParam, &smear_param, 50);
+    performAdjGFlowSafe(check_out.data(),check.data(), &invParam, &smear_param);
       
     
     break;
