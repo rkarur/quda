@@ -5407,6 +5407,7 @@ void performAdjGFlowSafe(void *h_out, void *h_in, QudaInvertParam *inv_param, Qu
   gParam.reconstruct = QUDA_RECONSTRUCT_NO; // temporary field is not on manifold so cannot use reconstruct
   GaugeField gaugeTemp(gParam);
 
+  const GaugeField gin = *gaugeSmeared;
   GaugeField &g_W0 = *gaugeSmeared;
   GaugeField &g_W1 = gaugeW1;
   GaugeField &g_W2 = gaugeW2;
@@ -5462,13 +5463,17 @@ void performAdjGFlowSafe(void *h_out, void *h_in, QudaInvertParam *inv_param, Qu
   {
       for (unsigned int i = 0; i < smear_param->n_steps - j; i++) {
           
-          if (i > 0) std::swap(g_W0,g_VT);
+          if (i == 0) g_W0 = gin;
+          else std::swap(g_W0,g_VT);
+          printf("our safe gauge field is \n");
+          g_W0.PrintMatrix(0,0,0,0);
 
           GFlowStep(g_W1, gaugeTemp, g_W0, smear_param->epsilon, smear_param->smear_type, WFLOW_STEP_W1);
           GFlowStep(g_W2, gaugeTemp, g_W1, smear_param->epsilon, smear_param->smear_type, WFLOW_STEP_W2);
           GFlowStep(g_VT, gaugeTemp, g_W2, smear_param->epsilon, smear_param->smear_type, WFLOW_STEP_VT);
 
       }
+      
     // init auxilliary fields [0], [1] and [2] as [3]
     f_temp0 = f_temp3;
     f_temp1 = f_temp3;
@@ -5508,7 +5513,9 @@ void performAdjGFlowSafe(void *h_out, void *h_in, QudaInvertParam *inv_param, Qu
     fout = f_temp0;
     //redefining f_temp0 to restart loop
     f_temp3 = f_temp0;
-      
+    printf("after first step safe, out in \n");
+    f_temp0.PrintVector(0,0,0);  
+    printf("\n\n");
 
   }
   cpuParam.v = h_out;
@@ -5516,12 +5523,15 @@ void performAdjGFlowSafe(void *h_out, void *h_in, QudaInvertParam *inv_param, Qu
   ColorSpinorField fout_h(cpuParam);
   fout_h = fout;
 
+    printf("after final step safe, out in \n");
+    fout.PrintVector(0,0,0); 
   popOutputPrefix();  
 }
 
 void adjSafeEvolve(std::vector<std::reference_wrapper<ColorSpinorField>> sf_list,std::vector<std::reference_wrapper<GaugeField>> gf_list, QudaGaugeSmearParam *smear_param, unsigned int ns_safe, TimeProfile &profile)
 { 
   printf("nsafe = %d \n",ns_safe);
+  const GaugeField gin = gf_list[0].get();
   GaugeField &g_W0 = gf_list[0].get();
   GaugeField &g_W1 = gf_list[1].get();
   GaugeField &g_W2 = gf_list[2].get();
@@ -5551,7 +5561,8 @@ void adjSafeEvolve(std::vector<std::reference_wrapper<ColorSpinorField>> sf_list
   {
       for (unsigned int i = 0; i < ns_safe - j; i++) {
           
-          if (i > 0) std::swap(g_W0,g_VT);
+          if (i == 0) g_W0 = gin;
+          else std::swap(g_W0,g_VT);
 
           GFlowStep(g_W1, gaugeTemp, g_W0, smear_param->epsilon, smear_param->smear_type, WFLOW_STEP_W1);
           GFlowStep(g_W2, gaugeTemp, g_W1, smear_param->epsilon, smear_param->smear_type, WFLOW_STEP_W2);
@@ -5814,7 +5825,7 @@ void performAdjGFlowHier(void *h_out, void *h_in, QudaInvertParam *inv_param, Qu
   ColorSpinorField f_temp3(deviceParam);
   ColorSpinorField f_temp4(deviceParam);
     
-  // initializing step: set [3] = input spinor
+  //IMPORTANT initializing step: set [3] = input spinor
   f_temp3 = fin;
     
   int n_b = ceil(pow(1. * smear_param->n_steps, 1. / (smear_param->adj_n_save + 1) ));
@@ -5824,16 +5835,17 @@ void performAdjGFlowHier(void *h_out, void *h_in, QudaInvertParam *inv_param, Qu
   std::vector<int> hier_list;
   //The first stage is saved at the very beginning, so its presence is implicit
   hier_list = get_hier_list(smear_param->n_steps, n_b,smear_param->adj_n_save);
- 
+  logQuda(QUDA_VERBOSE,"heir list size is %d\n",hier_list.size());
   if (threshold < hier_list.back()) threshold = hier_list.back();
   
   if (hier_list.empty()) errorQuda("hier_list is not populated\n");
   if (hier_list.size() != gauge_stages.size()) errorQuda("hier_list is not same size as gauge_stages \n");
     
-  for (unsigned int i = 0; i < hier_list.size(); i++) {
+  for (unsigned int i = 0; i < hier_list.size() - 1; i++) {
       
-      /*we first set gin to the first step*/
+      
       if (i == 0){
+      logQuda(QUDA_VERBOSE,"we first set gin to the first index of the gauge_Steps vector\n");
       gauge_stages[0] = gin;
       }
       
@@ -5844,8 +5856,8 @@ void performAdjGFlowHier(void *h_out, void *h_in, QudaInvertParam *inv_param, Qu
 
       }
       
-      if (i > 0)
-      gauge_stages[i] = gout;
+      // if (i > 0)
+      gauge_stages[i + 1] = gout;
   }
     
   std::vector<std::reference_wrapper<ColorSpinorField>> sf_list;
@@ -5858,8 +5870,12 @@ void performAdjGFlowHier(void *h_out, void *h_in, QudaInvertParam *inv_param, Qu
       logQuda(QUDA_VERBOSE,"Starting a hierarchical loop log\n");
       
       adjSafeEvolve(sf_list,gf_list,smear_param,hier_list.back(),profileAdjGFlowHier);
-      // std::swap(sf_list[0],sf_list[1]);
       
+      
+      printf("after first step hier, out3 \n");
+      sf_list[3].get().PrintVector(0,0,0);
+      printf("first hier gauge \n");
+      gauge_stages.back().PrintMatrix(0,0,0,0);
       for (int j = 0; j < hier_list.size(); j++ ){
           logQuda(QUDA_VERBOSE,"previous hier list element %d : %d \n",j,hier_list[j]);
       }
@@ -5871,14 +5887,18 @@ void performAdjGFlowHier(void *h_out, void *h_in, QudaInvertParam *inv_param, Qu
           logQuda(QUDA_VERBOSE," now in final serial stage of hierarchial evolution \n");
           for (int i = gauge_stages.size() - 1; i >= 0; --i) {
              //first load correct gauge field (for beginning of the loop, it is the final gauge list element) 
+              printf("after beginning of second step hier, out3 \n");
+              sf_list[3].get().PrintVector(0,0,0);
+              printf("new hier gauge \n");
+              gauge_stages[i].PrintMatrix(0,0,0,0);
              gf_list.at(0) = std::ref(gauge_stages[i]); 
 
              adjSafeEvolve(sf_list,gf_list,smear_param,hier_list[i],profileAdjGFlowHier);
 
              logQuda(QUDA_VERBOSE," block number %d successfully deployed \n",i);
-             // At final step, we do not conduct swap
-             // if (i != 0) std::swap(sf_list[0],sf_list[1]);
             }
+          printf("after first step hier, out in \n");
+          sf_list[0].get().PrintVector(0,0,0);
           logQuda(QUDA_VERBOSE," hierarchial evolution completed \n");
           break;
       }
@@ -5904,12 +5924,15 @@ void performAdjGFlowHier(void *h_out, void *h_in, QudaInvertParam *inv_param, Qu
       
    
   }
-    
+  fout = sf_list[0].get();
     
   cpuParam.v = h_out;
   cpuParam.location = inv_param->output_location;
   ColorSpinorField fout_h(cpuParam);
-  fout_h = sf_list[0].get();
+  fout_h = fout;
+    
+  printf("after final step hier, out in \n");
+  fout.PrintVector(0,0,0); 
     
   popOutputPrefix();
 
