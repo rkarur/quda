@@ -5412,8 +5412,6 @@ void performAdjGFlowSafe(void *h_out, void *h_in, QudaInvertParam *inv_param, Qu
   GaugeField &g_W2 = gaugeW2;
   GaugeField &g_VT = gaugeVT;
 
-  //   printf("Now calling gauge\n");
-  // g_W0.PrintMatrix(0, 0, 0, 0);
   //necessary?
   if (gParamDummy.order <= 4) gParamDummy.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
 
@@ -5467,10 +5465,6 @@ void performAdjGFlowSafe(void *h_out, void *h_in, QudaInvertParam *inv_param, Qu
           if (i > 0) std::swap(g_W0,g_VT);
 
           GFlowStep(g_W1, gaugeTemp, g_W0, smear_param->epsilon, smear_param->smear_type, WFLOW_STEP_W1);
-          // printf("\n\nprint what is the safe gaugeW0 now\n");
-          // g_W0.PrintMatrix(0,0,0,0);
-          // printf("\n\nprint what is the safe gaugeW1 now\n");
-          // g_W1.PrintMatrix(0,0,0,0);
           GFlowStep(g_W2, gaugeTemp, g_W1, smear_param->epsilon, smear_param->smear_type, WFLOW_STEP_W2);
           GFlowStep(g_VT, gaugeTemp, g_W2, smear_param->epsilon, smear_param->smear_type, WFLOW_STEP_VT);
 
@@ -5480,50 +5474,16 @@ void performAdjGFlowSafe(void *h_out, void *h_in, QudaInvertParam *inv_param, Qu
     f_temp1 = f_temp3;
     f_temp2 = f_temp3;
       
-//     printf("\n\nstarting safe study p0\n");
-//       fout.PrintVector(0,0,0);
-//       printf("\n");
-//       f_temp0.PrintVector(0,0,0);
-//       printf("\n");
-//       f_temp1.PrintVector(0,0,0);
-//       printf("\n");
-//       f_temp2.PrintVector(0,0,0);
-//       printf("\n");
-//       f_temp3.PrintVector(0,0,0);
-//       printf("\n");
-//       f_temp4.PrintVector(0,0,0);
-      
-//       printf("\n\nprint what is the safe gaugeW@ now\n");
-//       g_W2.PrintMatrix(0,0,0,0);
-      
     copyExtendedGauge(precise, g_W2, QUDA_CUDA_FIELD_LOCATION);
     precise.exchangeGhost();
     ApplyLaplace(f_temp4, f_temp0, precise, 4, a, b, f_temp0, parity, false, comm_dim, profileAdjGFlowSafe);  
-    // printf("\n\nprint what is the safe gauge now\n");
-    //   precise.PrintMatrix(0,0,0,0);
-    // printf("\n\nprint safe ft4 after laplacian\n");
-    //   f_temp4.PrintVector(0,0,0);  
-    // f_temp0 = 3./4.*f_temp4;
+
     blas::ax(smear_param->epsilon * 3. / 4., f_temp4);
       
       
       
     
     f_temp2 = f_temp4;
-      
-      
-      // printf("\n\nstarting safe study p1\n");
-      // fout.PrintVector(0,0,0);
-      // printf("\n");
-      // f_temp0.PrintVector(0,0,0);
-      // printf("\n");
-      // f_temp1.PrintVector(0,0,0);
-      // printf("\n");
-      // f_temp2.PrintVector(0,0,0);
-      // printf("\n");
-      // f_temp3.PrintVector(0,0,0);
-      // printf("\n");
-      // f_temp4.PrintVector(0,0,0);
       
     copyExtendedGauge(precise, g_W1, QUDA_CUDA_FIELD_LOCATION);
     precise.exchangeGhost();  
@@ -5568,14 +5528,12 @@ void adjSafeEvolve(std::vector<std::reference_wrapper<ColorSpinorField>> sf_list
   GaugeField &g_VT = gf_list[3].get();
   GaugeField &gaugeTemp = gf_list[4].get();
   GaugeField &precise =   gf_list[5].get();
-    
-  ColorSpinorField &fin = sf_list[0].get();
-  ColorSpinorField &fout = sf_list[1].get();
-  ColorSpinorField &f_temp0 = sf_list[2].get();
-  ColorSpinorField &f_temp1 = sf_list[3].get();
-  ColorSpinorField &f_temp2 = sf_list[4].get();
-  ColorSpinorField &f_temp3 = sf_list[5].get();
-  ColorSpinorField &f_temp4 = sf_list[6].get();  
+
+  ColorSpinorField &f_temp0 = sf_list[0].get();
+  ColorSpinorField &f_temp1 = sf_list[1].get();
+  ColorSpinorField &f_temp2 = sf_list[2].get();
+  ColorSpinorField &f_temp3 = sf_list[3].get();
+  ColorSpinorField &f_temp4 = sf_list[4].get();  
     
   int parity = 0;
 
@@ -5587,7 +5545,7 @@ void adjSafeEvolve(std::vector<std::reference_wrapper<ColorSpinorField>> sf_list
   // only switch on comms needed for directions with a derivative
   for (int i = 0; i < 4; i++) { comm_dim[i] = comm_dim_partitioned(i); }
     
-  f_temp3 = fin;
+  // f_temp3 = fin;
     
   for (unsigned int j = 0; j < ns_safe ; j++)
   {
@@ -5596,10 +5554,6 @@ void adjSafeEvolve(std::vector<std::reference_wrapper<ColorSpinorField>> sf_list
           if (i > 0) std::swap(g_W0,g_VT);
 
           GFlowStep(g_W1, gaugeTemp, g_W0, smear_param->epsilon, smear_param->smear_type, WFLOW_STEP_W1);
-          // printf("\n\nprint what is the hier gaugeW0 now\n");
-          // g_W0.PrintMatrix(0,0,0,0);
-          // printf("\n\nprint what is the hier gaugeW1 now\n");
-          // g_W1.PrintMatrix(0,0,0,0);
           GFlowStep(g_W2, gaugeTemp, g_W1, smear_param->epsilon, smear_param->smear_type, WFLOW_STEP_W2);
           GFlowStep(g_VT, gaugeTemp, g_W2, smear_param->epsilon, smear_param->smear_type, WFLOW_STEP_VT);
 
@@ -5608,48 +5562,15 @@ void adjSafeEvolve(std::vector<std::reference_wrapper<ColorSpinorField>> sf_list
     f_temp0 = f_temp3;
     f_temp1 = f_temp3;
     f_temp2 = f_temp3;
-      
-    //   printf("\n\nstarting hier study p0\n");
-    //   fout.PrintVector(0,0,0);
-    //   printf("\n");
-    //   f_temp0.PrintVector(0,0,0);
-    //   printf("\n");
-    //   f_temp1.PrintVector(0,0,0);
-    //   printf("\n");
-    //   f_temp2.PrintVector(0,0,0);
-    //   printf("\n");
-    //   f_temp3.PrintVector(0,0,0);
-    //   printf("\n");
-    //   f_temp4.PrintVector(0,0,0);
-    // // if (ns_safe == 43) {if (j==41) f_temp0.PrintVector(0,0,0);}
-    //   printf("\n\nprint what is the hier gaugeW@ now\n");
-    //   g_W2.PrintMatrix(0,0,0,0);
+
       
     copyExtendedGauge(precise, g_W2, QUDA_CUDA_FIELD_LOCATION);
     precise.exchangeGhost();
     ApplyLaplace(f_temp4, f_temp0, precise, 4, a, b, f_temp0, parity, false, comm_dim, profile);  
-      // printf("\n\nprint what is the hier gauge now\n");
-      // precise.PrintMatrix(0,0,0,0);
-      // printf("\n\nprint hier ft4 after laplacian\n");
-      // f_temp4.PrintVector(0,0,0); 
-      
-    // f_temp0 = 3./4.*f_temp4;
+
     blas::ax(smear_param->epsilon * 3. / 4., f_temp4);
     
     f_temp2 = f_temp4;
-      
-      // printf("\n\nstarting hier study p1\n");
-      // fout.PrintVector(0,0,0);
-      // printf("\n");
-      // f_temp0.PrintVector(0,0,0);
-      // printf("\n");
-      // f_temp1.PrintVector(0,0,0);
-      // printf("\n");
-      // f_temp2.PrintVector(0,0,0);
-      // printf("\n");
-      // f_temp3.PrintVector(0,0,0);
-      // printf("\n");
-      // f_temp4.PrintVector(0,0,0);
       
     copyExtendedGauge(precise, g_W1, QUDA_CUDA_FIELD_LOCATION);
     precise.exchangeGhost();  
@@ -5671,7 +5592,7 @@ void adjSafeEvolve(std::vector<std::reference_wrapper<ColorSpinorField>> sf_list
     blas::axpy(1.,f_temp2, f_temp0);
     blas::axpy(1.,f_temp1, f_temp0);
     
-    fout = f_temp0;
+    // fout = f_temp0;
     //redefining f_temp0 to restart loop
     f_temp3 = f_temp0;
       
@@ -5806,7 +5727,7 @@ void performAdjGFlowNB(void *h_out, void *h_in, QudaInvertParam *inv_param, Quda
       
   }
   std::vector<std::reference_wrapper<ColorSpinorField>> sf_list;
-  sf_list = {fin, fout, f_temp0, f_temp1, f_temp2, f_temp3, f_temp4};
+  sf_list = {f_temp0, f_temp1, f_temp2, f_temp3, f_temp4};
   std::vector<std::reference_wrapper<GaugeField>> gf_list;  
   gf_list = {gauge_stages.back(), gaugeW1, gaugeW2, gaugeVT, gaugeTemp, precise};
     
@@ -5818,7 +5739,6 @@ void performAdjGFlowNB(void *h_out, void *h_in, QudaInvertParam *inv_param, Quda
      adjSafeEvolve(sf_list,gf_list,smear_param,dist_save[i],profileAdjGFlowNB);
       
      logQuda(QUDA_VERBOSE," block number %d successfully deployed \n",i);
-     std::swap(sf_list[0],sf_list[1]);
     }
 
   cpuParam.v = h_out;
@@ -5894,7 +5814,7 @@ void performAdjGFlowHier(void *h_out, void *h_in, QudaInvertParam *inv_param, Qu
   ColorSpinorField f_temp3(deviceParam);
   ColorSpinorField f_temp4(deviceParam);
     
-  // set [3] = input spinor
+  // initializing step: set [3] = input spinor
   f_temp3 = fin;
     
   int n_b = ceil(pow(1. * smear_param->n_steps, 1. / (smear_param->adj_n_save + 1) ));
@@ -5909,31 +5829,19 @@ void performAdjGFlowHier(void *h_out, void *h_in, QudaInvertParam *inv_param, Qu
   
   if (hier_list.empty()) errorQuda("hier_list is not populated\n");
   if (hier_list.size() != gauge_stages.size()) errorQuda("hier_list is not same size as gauge_stages \n");
-
-  // printf("Now calling gauge\n");
-  // gin.PrintMatrix(0, 0, 0, 0);
-  // fin.PrintVector(0,0,0);
     
   for (unsigned int i = 0; i < hier_list.size(); i++) {
-      // printf("Gin before any evolve also\n\n");
-      // gin.PrintMatrix(0,0,0,0);
       
       /*we first set gin to the first step*/
       if (i == 0){
       gauge_stages[0] = gin;
-      // printf("printing hier at the very beginning\n\n");
-      // gauge_stages[0].PrintMatrix(0,0,0,0);
-      // printf("Now gin also\n\n");
-      // gin.PrintMatrix(0,0,0,0);
       }
       
       for (unsigned int j = 0; j < hier_list[i]; j++){
           if (i > 0) std::swap(gout,gin);
-          // printf("Gin immediately before evolve number below %d\n\n", j);
-          // gin.PrintMatrix(0,0,0,0);
+
           WFlowStep(gout, gaugeTemp, gin, smear_param->epsilon, smear_param->smear_type);
-          // printf("Gin after evolve number below %d\n\n", j);
-          // gin.PrintMatrix(0,0,0,0);
+
       }
       
       if (i > 0)
@@ -5941,7 +5849,7 @@ void performAdjGFlowHier(void *h_out, void *h_in, QudaInvertParam *inv_param, Qu
   }
     
   std::vector<std::reference_wrapper<ColorSpinorField>> sf_list;
-  sf_list = {fin, fout, f_temp0, f_temp1, f_temp2, f_temp3, f_temp4};
+  sf_list = {f_temp0, f_temp1, f_temp2, f_temp3, f_temp4};
   std::vector<std::reference_wrapper<GaugeField>> gf_list;  
   gf_list = {gauge_stages.back(), gaugeW1, gaugeW2, gaugeVT, gaugeTemp, precise};
   
@@ -5950,7 +5858,7 @@ void performAdjGFlowHier(void *h_out, void *h_in, QudaInvertParam *inv_param, Qu
       logQuda(QUDA_VERBOSE,"Starting a hierarchical loop log\n");
       
       adjSafeEvolve(sf_list,gf_list,smear_param,hier_list.back(),profileAdjGFlowHier);
-      std::swap(sf_list[0],sf_list[1]);
+      // std::swap(sf_list[0],sf_list[1]);
       
       for (int j = 0; j < hier_list.size(); j++ ){
           logQuda(QUDA_VERBOSE,"previous hier list element %d : %d \n",j,hier_list[j]);
@@ -5969,7 +5877,7 @@ void performAdjGFlowHier(void *h_out, void *h_in, QudaInvertParam *inv_param, Qu
 
              logQuda(QUDA_VERBOSE," block number %d successfully deployed \n",i);
              // At final step, we do not conduct swap
-             if (i != 0) std::swap(sf_list[0],sf_list[1]);
+             // if (i != 0) std::swap(sf_list[0],sf_list[1]);
             }
           logQuda(QUDA_VERBOSE," hierarchial evolution completed \n");
           break;
