@@ -5523,8 +5523,6 @@ void performAdjGFlowSafe(void *h_out, void *h_in, QudaInvertParam *inv_param, Qu
   ColorSpinorField fout_h(cpuParam);
   fout_h = fout;
 
-    printf("after final step safe, out in \n");
-    fout.PrintVector(0,0,0); 
   popOutputPrefix();  
 }
 
@@ -5660,104 +5658,104 @@ int modify_hier_list(std::vector<int> &hier_list, int n_b, int n_save, int thres
     
 void performAdjGFlowNB(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaGaugeSmearParam *smear_param){
 
-  auto profile = pushProfile(profileAdjGFlowNB);
-  pushOutputPrefix("performAdjGFlowQudaNB: ");
-  checkGaugeSmearParam(smear_param);
+//   auto profile = pushProfile(profileAdjGFlowNB);
+//   pushOutputPrefix("performAdjGFlowQudaNB: ");
+//   checkGaugeSmearParam(smear_param);
 
-  // pushVerbosity(inv_param->verbosity);
-  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
+//   // pushVerbosity(inv_param->verbosity);
+//   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
 
-  if (smear_param->restart) {
-    if (gaugeSmeared == nullptr) errorQuda("gaugeSmeared must be loaded");
-  } else {
-    if (gaugePrecise == nullptr) errorQuda("Gauge field must be loaded");
-    freeUniqueGaugeQuda(QUDA_SMEARED_LINKS);
-    gaugeSmeared = createExtendedGauge(*gaugePrecise, R, profileAdjGFlowNB);
-  }
+//   if (smear_param->restart) {
+//     if (gaugeSmeared == nullptr) errorQuda("gaugeSmeared must be loaded");
+//   } else {
+//     if (gaugePrecise == nullptr) errorQuda("Gauge field must be loaded");
+//     freeUniqueGaugeQuda(QUDA_SMEARED_LINKS);
+//     gaugeSmeared = createExtendedGauge(*gaugePrecise, R, profileAdjGFlowNB);
+//   }
  
-  GaugeFieldParam gParamDummy(*gaugeSmeared);
-  GaugeField gaugeW0(gParamDummy);
-  GaugeField gaugeW1(gParamDummy);
-  GaugeField gaugeW2(gParamDummy);
-  GaugeField gaugeVT(gParamDummy);
-  GaugeField gauge_out(gParamDummy);
+//   GaugeFieldParam gParamDummy(*gaugeSmeared);
+//   GaugeField gaugeW0(gParamDummy);
+//   GaugeField gaugeW1(gParamDummy);
+//   GaugeField gaugeW2(gParamDummy);
+//   GaugeField gaugeVT(gParamDummy);
+//   GaugeField gauge_out(gParamDummy);
 
-  GaugeFieldParam gParam(*gaugePrecise);
-  gParam.reconstruct = QUDA_RECONSTRUCT_NO; // temporary field is not on manifold so cannot use reconstruct
-  GaugeField gaugeTemp(gParam);
+//   GaugeFieldParam gParam(*gaugePrecise);
+//   gParam.reconstruct = QUDA_RECONSTRUCT_NO; // temporary field is not on manifold so cannot use reconstruct
+//   GaugeField gaugeTemp(gParam);
     
-  auto n = smear_param->adj_n_save;
+//   auto n = smear_param->adj_n_save;
 
-  std::vector<GaugeField> gauge_stages(n,gParamDummy);
-  //Can also do below
-  //creates copies std::vector<GaugeField> gauge_stages(n,*gaugeSmeared);
+//   std::vector<GaugeField> gauge_stages(n,gParamDummy);
+//   //Can also do below
+//   //creates copies std::vector<GaugeField> gauge_stages(n,*gaugeSmeared);
     
-  GaugeField &gin = *gaugeSmeared;
-  GaugeField &gout = gauge_out;
+//   GaugeField &gin = *gaugeSmeared;
+//   GaugeField &gout = gauge_out;
   
-  // helper gauge field for Laplace operator
-  GaugeField precise;
-  GaugeFieldParam gParam_helper(*gaugePrecise);
-  gParam_helper.create = QUDA_NULL_FIELD_CREATE;
-  precise = GaugeField(gParam_helper);
+//   // helper gauge field for Laplace operator
+//   GaugeField precise;
+//   GaugeFieldParam gParam_helper(*gaugePrecise);
+//   gParam_helper.create = QUDA_NULL_FIELD_CREATE;
+//   precise = GaugeField(gParam_helper);
 
-  // spinor fields
-  ColorSpinorParam cpuParam(h_in, *inv_param, gaugePrecise->X(), false, inv_param->input_location);
-  ColorSpinorField fin_h(cpuParam);
+//   // spinor fields
+//   ColorSpinorParam cpuParam(h_in, *inv_param, gaugePrecise->X(), false, inv_param->input_location);
+//   ColorSpinorField fin_h(cpuParam);
 
-  ColorSpinorParam deviceParam(cpuParam, *inv_param, QUDA_CUDA_FIELD_LOCATION);
-  ColorSpinorField fin(deviceParam);
-  fin = fin_h;
+//   ColorSpinorParam deviceParam(cpuParam, *inv_param, QUDA_CUDA_FIELD_LOCATION);
+//   ColorSpinorField fin(deviceParam);
+//   fin = fin_h;
 
-  deviceParam.create = QUDA_NULL_FIELD_CREATE;
-  ColorSpinorField fout(deviceParam);
+//   deviceParam.create = QUDA_NULL_FIELD_CREATE;
+//   ColorSpinorField fout(deviceParam);
     
-  ColorSpinorField f_temp0(deviceParam);
-  ColorSpinorField f_temp1(deviceParam);
-  ColorSpinorField f_temp2(deviceParam);
-  ColorSpinorField f_temp3(deviceParam);
-  ColorSpinorField f_temp4(deviceParam);
+//   ColorSpinorField f_temp0(deviceParam);
+//   ColorSpinorField f_temp1(deviceParam);
+//   ColorSpinorField f_temp2(deviceParam);
+//   ColorSpinorField f_temp3(deviceParam);
+//   ColorSpinorField f_temp4(deviceParam);
     
   
   
-  unsigned int block_length = smear_param->n_steps / smear_param->adj_n_save;
-  int block_counter = 0;
-  std::vector<int> dist_save(smear_param->adj_n_save);
-  std::fill(dist_save.begin(), dist_save.end(), block_length);
-  dist_save.at(dist_save.size() - 1) = smear_param->n_steps - (smear_param->adj_n_save - 1) * block_length;
+//   unsigned int block_length = smear_param->n_steps / smear_param->adj_n_save;
+//   int block_counter = 0;
+//   std::vector<int> dist_save(smear_param->adj_n_save);
+//   std::fill(dist_save.begin(), dist_save.end(), block_length);
+//   dist_save.at(dist_save.size() - 1) = smear_param->n_steps - (smear_param->adj_n_save - 1) * block_length;
     
-  for (unsigned int i = 0; i < smear_param->adj_n_save; i++)  logQuda(QUDA_VERBOSE,"evolve distance of %d added \n",dist_save[i]); 
+//   for (unsigned int i = 0; i < smear_param->adj_n_save; i++)  logQuda(QUDA_VERBOSE,"evolve distance of %d added \n",dist_save[i]); 
     
-  for (unsigned int i = 0; i < smear_param->adj_n_save; i++) {
+//   for (unsigned int i = 0; i < smear_param->adj_n_save; i++) {
       
-      gauge_stages[i] = gout;    
-      for (unsigned int j = 0; j < block_length; j++){
-          if (i > 0) std::swap(gout,gin);
-          WFlowStep(gout, gaugeTemp, gin, smear_param->epsilon, smear_param->smear_type);
-      }
+//       gauge_stages[i] = gout;    
+//       for (unsigned int j = 0; j < block_length; j++){
+//           if (i > 0) std::swap(gout,gin);
+//           WFlowStep(gout, gaugeTemp, gin, smear_param->epsilon, smear_param->smear_type);
+//       }
       
-  }
-  std::vector<std::reference_wrapper<ColorSpinorField>> sf_list;
-  sf_list = {f_temp0, f_temp1, f_temp2, f_temp3, f_temp4};
-  std::vector<std::reference_wrapper<GaugeField>> gf_list;  
-  gf_list = {gauge_stages.back(), gaugeW1, gaugeW2, gaugeVT, gaugeTemp, precise};
+//   }
+//   std::vector<std::reference_wrapper<ColorSpinorField>> sf_list;
+//   sf_list = {f_temp0, f_temp1, f_temp2, f_temp3, f_temp4};
+//   std::vector<std::reference_wrapper<GaugeField>> gf_list;  
+//   gf_list = {gauge_stages.back(), gaugeW1, gaugeW2, gaugeVT, gaugeTemp, precise};
     
 
-  for (int i = gauge_stages.size() - 1; i >= 0; --i) {
-     //first load correct gauge field (for beginning of the loop, it is the final gauge list element) 
-     if (i < gauge_stages.size() - 1) gf_list.at(0) = std::ref(gauge_stages[i]); 
+//   for (int i = gauge_stages.size() - 1; i >= 0; --i) {
+//      //first load correct gauge field (for beginning of the loop, it is the final gauge list element) 
+//      if (i < gauge_stages.size() - 1) gf_list.at(0) = std::ref(gauge_stages[i]); 
      
-     adjSafeEvolve(sf_list,gf_list,smear_param,dist_save[i],profileAdjGFlowNB);
+//      adjSafeEvolve(sf_list,gf_list,smear_param,dist_save[i],profileAdjGFlowNB);
       
-     logQuda(QUDA_VERBOSE," block number %d successfully deployed \n",i);
-    }
+//      logQuda(QUDA_VERBOSE," block number %d successfully deployed \n",i);
+//     }
 
-  cpuParam.v = h_out;
-  cpuParam.location = inv_param->output_location;
-  ColorSpinorField fout_h(cpuParam);
-  fout_h = sf_list[1].get();
+//   cpuParam.v = h_out;
+//   cpuParam.location = inv_param->output_location;
+//   ColorSpinorField fout_h(cpuParam);
+//   fout_h = sf_list[1].get();
     
-  popOutputPrefix();
+//   popOutputPrefix();
     
 }
 
@@ -5850,9 +5848,11 @@ void performAdjGFlowHier(void *h_out, void *h_in, QudaInvertParam *inv_param, Qu
       }
       
       for (unsigned int j = 0; j < hier_list[i]; j++){
-          if (i > 0) std::swap(gout,gin);
+          if (j > 0) std::swap(gout,gin);
 
           WFlowStep(gout, gaugeTemp, gin, smear_param->epsilon, smear_param->smear_type);
+          printf("hier gauge # %d:\n",j+1);
+          gout.PrintMatrix(0,0,0,0);
 
       }
       
@@ -5872,10 +5872,10 @@ void performAdjGFlowHier(void *h_out, void *h_in, QudaInvertParam *inv_param, Qu
       adjSafeEvolve(sf_list,gf_list,smear_param,hier_list.back(),profileAdjGFlowHier);
       
       
-      printf("after first step hier, out3 \n");
-      sf_list[3].get().PrintVector(0,0,0);
+
       printf("first hier gauge \n");
       gauge_stages.back().PrintMatrix(0,0,0,0);
+      
       for (int j = 0; j < hier_list.size(); j++ ){
           logQuda(QUDA_VERBOSE,"previous hier list element %d : %d \n",j,hier_list[j]);
       }
@@ -5887,10 +5887,11 @@ void performAdjGFlowHier(void *h_out, void *h_in, QudaInvertParam *inv_param, Qu
           logQuda(QUDA_VERBOSE," now in final serial stage of hierarchial evolution \n");
           for (int i = gauge_stages.size() - 1; i >= 0; --i) {
              //first load correct gauge field (for beginning of the loop, it is the final gauge list element) 
-              printf("after beginning of second step hier, out3 \n");
-              sf_list[3].get().PrintVector(0,0,0);
+
               printf("new hier gauge \n");
               gauge_stages[i].PrintMatrix(0,0,0,0);
+              
+              
              gf_list.at(0) = std::ref(gauge_stages[i]); 
 
              adjSafeEvolve(sf_list,gf_list,smear_param,hier_list[i],profileAdjGFlowHier);
