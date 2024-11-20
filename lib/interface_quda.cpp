@@ -5846,6 +5846,7 @@ void performAdjGFlowHier(void *h_out, void *h_in, QudaInvertParam *inv_param, Qu
       logQuda(QUDA_VERBOSE,"we first set gin to the first index of the gauge_Steps vector\n");
       gauge_stages[0] = gin;
       }
+      if (i > 0) std::swap(gout,gin);
       
       for (unsigned int j = 0; j < hier_list[i]; j++){
           if (j > 0) std::swap(gout,gin);
