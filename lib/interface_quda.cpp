@@ -5415,9 +5415,6 @@ void performAdjGFlowSafe(void *h_out, void *h_in, QudaInvertParam *inv_param, Qu
 
   //necessary?
   if (gParamDummy.order <= 4) gParamDummy.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
-
-  auto smear_type = QUDA_GAUGE_SMEAR_WILSON_FLOW;
-    
   
   // helper gauge field for Laplace operator
   GaugeField precise;
